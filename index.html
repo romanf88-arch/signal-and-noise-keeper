@@ -42,7 +42,7 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   body{ font-family:'Nunito',system-ui,Segoe UI,Roboto,Arial,sans-serif; color:var(--text);
     background:radial-gradient(120% 80% at 50% 0%, #2b3c5c 0%, #161f30 70%, #0f1622 100%);
     min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:10px; }
-  #wrap{ width:100%; max-width:920px; }
+  #wrap{ width:100%; max-width:1060px; }
   #topbar{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px; margin-bottom:8px; min-height:34px; }
   #topbar .title{ font-family:'Cinzel',serif; font-weight:700; color:#f3ead4; font-size:17px; letter-spacing:.6px; }
   .tbtns{ display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -170,6 +170,24 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   .nlog{ width:100%; border-collapse:collapse; margin:6px 0 10px; font-size:11.5px; }
   .nlog th{ text-align:center; font-weight:800; color:#7a7282; padding:2px 3px; border-bottom:1px solid var(--edge); }
   .nlog td{ text-align:center; padding:2px 3px; color:#473d4a; border-bottom:1px solid #eadfc3; }
+  /* slideshow: paged, digestible psychology (replaces scroll-past prose) */
+  .slideshow{ display:flex; flex-direction:column; min-height:min(440px,72vh); }
+  .slide{ flex:1 1 auto; display:flex; flex-direction:column; animation:slidein .28s ease-out; }
+  @keyframes slidein{ from{ opacity:0; transform:translateX(14px);} to{ opacity:1; transform:none; } }
+  .slide .kicker{ font-size:11px; font-weight:900; letter-spacing:.8px; text-transform:uppercase; color:#2c5b66; margin-bottom:3px; }
+  .slide h2{ font-family:'Cinzel',serif; font-size:23px; color:var(--ink); margin:0 0 10px; }
+  .slidevisual{ display:flex; align-items:center; justify-content:center; margin:2px 0 12px; }
+  .slidevisual img{ max-width:100%; max-height:260px; border-radius:12px; border:2px solid var(--edge); object-fit:cover; box-shadow:0 6px 18px rgba(8,14,26,.3); }
+  .slidevisual svg{ max-width:100%; }
+  .slidevisual .portrait{ width:120px; height:120px; border-radius:50%; border:3px solid var(--lampDk); object-fit:cover; }
+  .slidebody{ font-family:'Spectral',serif; font-size:17px; line-height:1.62; color:#3b3340; }
+  .slidebody p{ margin:0 0 9px; } .slidebody b{ color:#2c5b66; }
+  .slidenav{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:14px; padding-top:12px; border-top:1px solid #eadfc3; flex-wrap:wrap; }
+  .slidenav .btn{ margin-top:0; }
+  .dots{ display:flex; gap:7px; align-items:center; }
+  .dot{ width:9px; height:9px; border-radius:50%; background:#d8cbb0; transition:background .2s,transform .2s; }
+  .dot.on{ background:var(--lampDk); transform:scale(1.25); }
+  .slidehint{ font-size:11.5px; color:#9a927f; text-align:center; margin-top:6px; }
   :focus-visible{ outline:3px solid var(--lamp); outline-offset:2px; }
   .vh{ position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%); }
   @media (max-width:560px){
@@ -198,7 +216,7 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   </div>
   <div id="stagewrap">
     <video id="bgvid" muted loop autoplay playsinline preload="auto" aria-hidden="true"></video>
-    <canvas id="stage" width="760" height="320" tabindex="0" aria-label="The harbor. Read the sky, then choose to light the lamp or leave it dark."></canvas>
+    <canvas id="stage" width="760" height="430" tabindex="0" aria-label="The harbor. Read the sky, then choose to light the lamp or leave it dark."></canvas>
     <div id="overlay"><div class="panel" id="panel"></div></div>
   </div>
 
@@ -262,17 +280,26 @@ const CONFIG = {
   beatMs: 700,             // resolve beats: dock answers, then the weather
   bellMs: 600,             // the muster bell holds the room
   autoMs: 2500,            // quiet-night auto-advance
+  probeSpread: 12,         // graded readout spread for the probe (heedSpread stays 4 for behavior)
 };
-const W = 760, H = 320, STEP = 1/60;
+const W = 760, H = 430, STEP = 1/60;
 function heedProb(trust, thresh){ return 1/(1+Math.exp(-(trust-thresh)/CONFIG.heedSpread)); }
+// the CONDITIONED RESPONSE strength read on a probe (CS-alone test): a graded, gentler curve than the heed behavior
+function probeReflex(v, thresh){ return 1/(1+Math.exp(-(v-thresh)/CONFIG.probeSpread)); }
 /* ============================ RNG ============================ */
+// TWO streams. `rng` drives ALL scored game state (deck, gauge, dock) in a fixed consumption order --
+// that fixed order is what makes the headless fairness battery byte-reproducible. Probes and the between-
+// season mini-games must NEVER draw from `rng`; they use `auxRng` so bots advance it harmlessly while the
+// deck/trust/gauss/binom sequence stays identical.
 function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 let rng = mulberry32(((Math.random()*1e9)|0) || 7);
+let auxRng = mulberry32(((Math.random()*1e9)|0) || 101);   // isolated: probes + mini-games only
 function gauss(){ let u=0,v=0; while(!u)u=rng(); while(!v)v=rng(); return Math.sqrt(-2*Math.log(u))*Math.cos(6.28318*v); }
 function binom(n,p){ let k=0; for(let i=0;i<n;i++) if(rng()<p) k++; return k; }
+function binomAux(n,p){ let k=0; for(let i=0;i<n;i++) if(auxRng()<p) k++; return k; }   // probe scramble only
 /* ============================ ASSETS ============================ */
 const IMG = {};
-['bg_starlit','bg_storm','bg_dusk','bg_dawn','bg_harbor_fog','boat','deep','crew','coast_map','lighthouse_interior','portrait_marisol','portrait_odell','portrait_previous'].forEach(k=>{
+['bg_starlit','bg_storm','bg_dusk','bg_dawn','bg_harbor_fog','boat','deep','crew','coast_map','lighthouse_interior','portrait_marisol','portrait_odell','portrait_previous','portrait_sefu'].forEach(k=>{
   const im=new Image(); im.onload=()=>{ if(im.naturalWidth>2){ IMG[k]=im; if(typeof state!=='undefined' && (state==='menu'||state==='title') && typeof renderOverlay==='function') renderOverlay(); } };
   im.onerror=()=>{}; im.src='assets/'+k+'.webp'; });
 /* background video layer (title: menu_loop; finale: deep_rising) */
@@ -478,6 +505,7 @@ function newGame(idx){
   if(idx!=null) levelIdx=idx;
   const L=LEVELS[levelIdx];
   rng = mulberry32(((Math.random()*1e9)|0)||7);
+  auxRng = mulberry32(((Math.random()*1e9)|0)||101);   // isolated probe/mini-game stream (never touches the deck/gauge/dock sequence)
   G = { lev:L, night:1, boats:L.startBoats, trust:(L.startTrust!=null?L.startTrust:(L.startReadiness||0)), catch:0,
         decided:false, lit:false, outcome:null, log:[], stats:{hit:0,fa:0,miss:0,cr:0},
         weatherStorm:false, crewOut:false, sky:0, finale:false, inQuiet:false,
@@ -491,6 +519,8 @@ function newGame(idx){
         // SEASON 4: operant. R = drill readiness (the behavior), S = the idle ritual. Reward what the crew DID.
         readiness:L.startReadiness||0, ritual:L.startRitual||0, rations:L.rations||0, drilled:null, reinforced:null,
         emissionShown:true, readinessHistory:[L.startReadiness||0], ritualHistory:[L.startRitual||0],
+        // PROBE TRIALS (CS-alone test): read-only measurement of the conditioned response. Writes nothing scored.
+        probeHistory:[], lastProbe:null, probeScene:null, isExtraProbe:false,
         pools:{ calm:SKYPOOL.calm.slice(), mid:SKYPOOL.mid.slice(), heavy:SKYPOOL.heavy.slice(),
                 bLo:BARKS.lo.slice(), bMd:BARKS.md.slice(), bHi:BARKS.hi.slice(), bMiss:BARKS.miss.slice() } };
   if(L.decoyNights){
@@ -1072,8 +1102,43 @@ function renderBelief(){
   }
 }
 function startLevel(){ audioOn(); theme(false); newGame(levelIdx); state='reading'; overlayWrap.hidden=true; showBgVideo(false); renderDecision(); canvas.focus({preventScroll:true}); }
+/* ============================ SLIDESHOW ============================ */
+// Paged, one-idea-per-screen presentation of the psychology, with a visual on every slide, so the
+// teaching cannot be scrolled past. Each slide: {kicker,title,visual(html),body(html)}; the last slide
+// carries action buttons via slide.actions, wired by the wire() callback.
+let _slides=null, _slideIx=0, _slideWire=null;
+function imgSlide(src, alt, cls){ return '<img class="'+(cls||'')+'" src="assets/'+src+'" alt="'+(alt||'')+'" onerror="this.style.display=\'none\'">'; }
+function renderSlides(slides, wire){ _slides=slides.filter(Boolean); _slideIx=0; _slideWire=wire||null; drawSlide(); }
+function drawSlide(){
+  if(!_slides) return;
+  const s=_slides[_slideIx], n=_slides.length, last=_slideIx===n-1;
+  const dots=_slides.map((_,i)=>'<span class="dot'+(i===_slideIx?' on':'')+'"></span>').join('');
+  overlay.innerHTML = '<div class="slideshow"><div class="slide" data-i="'+_slideIx+'">'
+    + (s.kicker?'<div class="kicker">'+s.kicker+'</div>':'')
+    + (s.title?'<h2>'+s.title+'</h2>':'')
+    + (s.visual?'<div class="slidevisual">'+s.visual+'</div>':'')
+    + '<div class="slidebody">'+(s.body||'')+'</div>'
+    + '</div>'
+    + '<div class="slidenav">'
+    +   '<button class="btn" id="slPrev" style="background:linear-gradient(180deg,#8a96a3,#6c7884)'+(_slideIx===0?';visibility:hidden':'')+'">‹ Back</button>'
+    +   '<div class="dots">'+dots+'</div>'
+    +   (last ? '<span id="slActions">'+(s.actions||'')+'</span>' : '<button class="btn" id="slNext">Next ›</button>')
+    + '</div>'
+    + (last?'':'<div class="slidehint">use the arrow keys, or Next</div>')
+    + '</div>';
+  if($('slPrev')) $('slPrev').onclick=()=>{ if(_slideIx>0){ _slideIx--; drawSlide(); } };
+  if($('slNext')) $('slNext').onclick=()=>{ if(_slideIx<n-1){ _slideIx++; drawSlide(); } };
+  if(_slideWire) _slideWire(_slideIx, last);
+}
+function slideKey(k){
+  if(!_slides) return false;
+  if(k==='arrowleft'){ if(_slideIx>0){ _slideIx--; drawSlide(); } return true; }
+  if(k==='arrowright'){ if(_slideIx<_slides.length-1){ _slideIx++; drawSlide(); } return true; }
+  return false;
+}
 /* ============================ OVERLAYS ============================ */
 function renderOverlay(){
+  if(!(state==='won'||state==='lost')) _slides=null;   // leave slideshow mode
   $('wrap').classList.remove('playing');
   { const bm=$('bMenu'); if(bm) bm.hidden=true; }
   overlayWrap.hidden = !(state==='title'||state==='menu'||state==='won'||state==='lost');
@@ -1159,50 +1224,59 @@ function renderOverlay(){
   const curveLabels = opv
     ? { primary:'drill readiness (the behavior)', secondary:'the idle ritual', threshold:'a self-started drill above this line' }
     : (L.id===3 ? { primary:'your lamp (CS+)', secondary:'Sefu’s lantern (CS-)', threshold:'they heed above this line' } : null);
-  const curve = `${trustCurveSVG(G.trustHistory, L.heedThreshold, opv?G.ritualHistory:(L.id===3?G.vMinusHistory:null), curveLabels)}<p class="small">${cap}</p>`;
+  const curveSVG = trustCurveSVG(G.trustHistory, L.heedThreshold, opv?G.ritualHistory:(L.id===3?G.vMinusHistory:null), curveLabels);
+  const faces = {1:'portrait_previous.webp',2:'portrait_odell.webp',3:'portrait_sefu.webp',4:'portrait_marisol.webp'};
+  const face = faces[L.id]||'portrait_marisol.webp';
+  const outImg = won ? 'bg_dawn.webp' : (['deep','superstition','weak','decoy'].indexOf(why)>=0 ? 'deep.webp' : 'bg_storm.webp');
   const lossLead = opv
     ? 'What you were building, and ran short of, is a drill the crew would run on their own. '
     : 'What you were building, and ran short of, is the crew’s learned trust in the lamp. ';
+  const youWatched = opv
+    ? 'You watched the drill readiness climb as you rewarded the crew for the thing you wanted, and the idle ritual climb on the nights you rewarded them for nothing in particular. A behavior grows when it pays and fades when it stops paying, and the whole season was you deciding, night by night, which behavior to feed.'
+    : 'You watched that belief rise and fall as you conditioned the crew, and you bet on it each time the harbormaster called a muster. In a real study the strength behind a learned response is invisible, inferred only from behavior like the mooring on the dock; here you got to watch the very thing that is normally hidden.';
   if(!won){
-    overlay.innerHTML = `<h2>${titles[why]}</h2><p class="prose">${leads[why]}</p>
-      <h3>What you were building</h3>
-      ${curve}
-      <p class="prose">${lossLead}${L.debrief.body}</p>
-      ${conceptMap(L)}
-      <h3>The season, night by night</h3>
-      ${nightLogTable()}
-      ${statline}${mirror}
-      <button class="btn" id="bRetry" type="button">Take the season again</button>
-      <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">⚓ Back to the harbor</button>`;
-    $('bRetry').onclick=startLevel;
-    if($('bHarbor')) $('bHarbor').onclick=()=>{ state='menu'; renderOverlay(); };
+    const slides=[
+      { kicker:'The season turns', title:titles[why], visual:imgSlide(outImg,'the harbor'),
+        body:`<p>${leads[why]}</p>` },
+      { kicker:'What you were building', title:'The belief, made visible', visual:curveSVG,
+        body:`<p>${cap}</p>` },
+      { kicker:'The idea, named', title:'', visual:imgSlide(face,'','portrait'),
+        body:`<p>${lossLead}${L.debrief.body}</p>${conceptMap(L)}` },
+      { kicker:'The season, night by night', title:'', visual:'',
+        body:`${nightLogTable()}${statline}${mirror}` },
+      { kicker:'Take it again', title:'', visual:'',
+        body:`<p>Each season is one experiment. Read the crew, spend your nights well, and the belief you build will hold when it counts.</p>`,
+        actions:`<button class="btn" id="bRetry" type="button">Take the season again</button> <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">⚓ Harbor</button>` },
+    ];
+    renderSlides(slides, (ix,last)=>{ if(last){
+      if($('bRetry')) $('bRetry').onclick=startLevel;
+      if($('bHarbor')) $('bHarbor').onclick=()=>{ state='menu'; renderOverlay(); };
+    }});
     return;
   }
   maxUnlocked=Math.max(maxUnlocked, Math.min(levelIdx+1, LEVELS.length-1)); saveProgress();
   const hasNext = levelIdx+1 < LEVELS.length;
-  const sefu = (L.id===2)? `<p class="prose" style="color:#6a5a2e">A peddler named Sefu has set a lantern stall on the dock. Some nights, from the water, his light looks like yours.</p>` : '';
-  overlay.innerHTML = `<h2>${titles.win}</h2><p class="prose">${leads.win}</p>
-    ${L.back? `<p class="prose" style="color:#6a5a2e">${L.back}</p>`:''}
-    <h3>What you were really doing</h3>
-    <p class="prose">${L.debrief.body}</p>
-    ${curve}
-    ${conceptMap(L)}
-    <p class="prose">${opv
-      ? 'You watched the drill readiness climb as you rewarded the crew for the thing you wanted, and the idle ritual climb on the nights you rewarded them for nothing in particular. A behavior grows when it pays and fades when it stops paying, and the whole season was you deciding, night by night, which behavior to feed.'
-      : 'You watched that belief rise and fall as you conditioned the crew, and you bet on it each time the harbormaster called a muster. In a real study the strength behind a learned response is usually invisible, inferred only from behavior like the mooring on the dock; here you got to watch the very thing that is normally hidden.'}</p>
-    <h3>The season, night by night</h3>
-    ${nightLogTable()}
-    <p class="prose"><b>Carry it off the coast:</b> ${L.debrief.transfer}</p>
-    ${statline}${mirror}
-    <p class="small">Read more: <a href="${L.debrief.url}" target="_blank" rel="noopener">the psychology behind this season</a> (opens in a new tab).</p>
-    ${sefu}
-    ${hasNext
-      ? `<button class="btn" id="bNext" type="button">Begin the next season: ${LEVELS[levelIdx+1].name}</button> <button class="btn" id="bAgain" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">Replay this season</button>`
-      : `<button class="btn" id="bAgain" type="button">Take this season again</button>`}
-    <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">⚓ Harbor</button>`;
-  if($('bNext')) $('bNext').onclick=()=>{ levelIdx++; state='menu'; renderOverlay(); };
-  if($('bAgain')) $('bAgain').onclick=startLevel;
-  if($('bHarbor')) $('bHarbor').onclick=()=>{ state='menu'; renderOverlay(); };
+  const sefu = (L.id===2)? `<p style="color:#6a5a2e">A peddler named Sefu has set a lantern stall on the dock. Some nights, from the water, his light looks like yours.</p>` : '';
+  const winSlides=[
+    { kicker:'The season turns', title:titles.win, visual:imgSlide('bg_dawn.webp','dawn over the harbor'),
+      body:`<p>${leads.win}</p>${L.back?`<p style="color:#6a5a2e">${L.back}</p>`:''}` },
+    { kicker:'What you were really doing', title:'The belief, made visible', visual:curveSVG,
+      body:`<p>${cap}</p>` },
+    { kicker:'The idea, named', title:'', visual:imgSlide(face,'','portrait'),
+      body:`<p>${L.debrief.body}</p>${conceptMap(L)}<p>${youWatched}</p>` },
+    { kicker:'The season, night by night', title:'', visual:'',
+      body:`${nightLogTable()}${statline}${mirror}` },
+    { kicker:'Carry it off the coast', title:'', visual:'',
+      body:`<p>${L.debrief.transfer}</p>${sefu}<p class="small">Read more: <a href="${L.debrief.url}" target="_blank" rel="noopener">the psychology behind this season</a> (opens in a new tab).</p>`,
+      actions:`${hasNext
+        ? `<button class="btn" id="bNext" type="button">Next: ${LEVELS[levelIdx+1].name} ▶</button> <button class="btn" id="bAgain" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">Replay</button>`
+        : `<button class="btn" id="bAgain" type="button">Take this season again</button>`} <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">⚓ Harbor</button>` },
+  ];
+  renderSlides(winSlides, (ix,last)=>{ if(last){
+    if($('bNext')) $('bNext').onclick=()=>{ levelIdx++; state='menu'; renderOverlay(); };
+    if($('bAgain')) $('bAgain').onclick=startLevel;
+    if($('bHarbor')) $('bHarbor').onclick=()=>{ state='menu'; renderOverlay(); };
+  }});
 }
 function announce(m){ $('sr').textContent=''; setTimeout(()=>$('sr').textContent=m,40); }
 /* ============================ CANVAS SCENE ============================ */
@@ -1354,7 +1428,8 @@ addEventListener('keydown',e=>{ const k=e.key.toLowerCase();
     } else {
       if(k==='l'||k===' '){ e.preventDefault(); decide(true); } else if(k==='d'){ e.preventDefault(); decide(false); }
     }
-  } else if(state==='resolved'){ if(k===' '||k==='enter'){ e.preventDefault(); if(!G.beat||G.beat===2) nextNight(); } } });
+  } else if(state==='resolved'){ if(k===' '||k==='enter'){ e.preventDefault(); if(!G.beat||G.beat===2) nextNight(); } }
+  else if(state==='won'||state==='lost'){ if(slideKey(k)) e.preventDefault(); } });
 ['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{ audioOn(); if(state==='title'||state==='menu') theme(true); },{once:true}));
 levelIdx=0; fit(); renderOverlay(); requestAnimationFrame(frame);
 /* test seam */
