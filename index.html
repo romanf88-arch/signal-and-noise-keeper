@@ -188,6 +188,20 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   .dot{ width:9px; height:9px; border-radius:50%; background:#d8cbb0; transition:background .2s,transform .2s; }
   .dot.on{ background:var(--lampDk); transform:scale(1.25); }
   .slidehint{ font-size:11.5px; color:#9a927f; text-align:center; margin-top:6px; }
+  /* the chandlery (shop) */
+  .shopgrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:6px 0; }
+  .shopitem{ background:#fbf4e2; border:2px solid var(--lampDk); border-radius:11px; padding:9px 11px; display:flex; flex-direction:column; }
+  .si-head{ display:flex; align-items:baseline; justify-content:space-between; gap:6px; flex-wrap:wrap; }
+  .si-name{ font-family:'Cinzel',serif; font-weight:700; font-size:15px; color:#5a4a2e; }
+  .si-sub{ color:#8a7a58; }
+  .si-effect{ font-size:13px; color:#2c5b66; font-weight:700; margin:3px 0 5px; }
+  .si-teach{ font-family:'Spectral',serif; font-size:12.5px; line-height:1.45; color:#5a4a3a; flex:1 1 auto; }
+  .si-lab{ display:block; font-size:9px; font-weight:900; letter-spacing:.6px; text-transform:uppercase; color:#a9802a; }
+  .si-foot{ margin-top:8px; }
+  .si-btn{ margin-top:0; font-size:14px; padding:9px 14px; }
+  .si-owned{ font-weight:800; color:#3c7a5d; font-size:13px; }
+  .si-locked{ font-weight:800; color:#9a6a4a; font-size:12.5px; }
+  @media (max-width:560px){ .shopgrid{ grid-template-columns:1fr; } }
   :focus-visible{ outline:3px solid var(--lamp); outline-offset:2px; }
   .vh{ position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%); }
   @media (max-width:560px){
@@ -210,6 +224,7 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   <div id="topbar">
     <div class="title">Signal &amp; Noise</div>
     <div class="tbtns">
+      <span id="coins" class="tbtn" hidden style="cursor:default;background:#fff7e2" title="Your wages" aria-label="Your money">🪙&nbsp;<b id="coinVal">0</b></span>
       <button id="bMenu" class="tbtn" type="button" hidden aria-label="Leave the season and return to the harbor">⚓ Harbor</button>
       <span class="vol" title="Music volume">🎵<input id="vol" type="range" min="0" max="100" value="60" aria-label="Music volume"></span>
     </div>
@@ -295,8 +310,19 @@ function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.im
 let rng = mulberry32(((Math.random()*1e9)|0) || 7);
 let auxRng = mulberry32(((Math.random()*1e9)|0) || 101);   // isolated: probes + mini-games only
 function gauss(){ let u=0,v=0; while(!u)u=rng(); while(!v)v=rng(); return Math.sqrt(-2*Math.log(u))*Math.cos(6.28318*v); }
+function gaussAux(){ let u=0,v=0; while(!u)u=auxRng(); while(!v)v=auxRng(); return Math.sqrt(-2*Math.log(u))*Math.cos(6.28318*v); }
 function binom(n,p){ let k=0; for(let i=0;i<n;i++) if(rng()<p) k++; return k; }
 function binomAux(n,p){ let k=0; for(let i=0;i<n;i++) if(auxRng()<p) k++; return k; }   // probe scramble only
+// THE STORM INSTRUMENT (Storm-Glass -> Barometer -> Radar): a bought upgrade that sharpens the READ of the
+// dealt weather, never the weather itself. It blends the primary gauge read (on rng) with an extra reading
+// from auxRng, lowering the effective noise. Capped so d' never exceeds ~2.4 (an ambiguous night always survives).
+// Draws ONLY from auxRng, so the deck/gauge/mooring rng sequence stays byte-identical for a keeper without one.
+function skyRefine(raw, base){
+  const w = [0, 0.10, 0.16, 0.22][Math.min(3, save.instrTier||0)] || 0;   // effective SD 0.13 -> 0.118 -> 0.111 -> 0.105 (d' <= 2.3, never an oracle)
+  if(w<=0) return raw;
+  const second = base + gaussAux()*CONFIG.gaugeSd;
+  return raw*(1-w) + second*w;
+}
 /* ============================ ASSETS ============================ */
 const IMG = {};
 ['bg_starlit','bg_storm','bg_dusk','bg_dawn','bg_harbor_fog','boat','deep','crew','coast_map','lighthouse_interior','portrait_marisol','portrait_odell','portrait_previous','portrait_sefu'].forEach(k=>{
@@ -480,8 +506,148 @@ const LEVELS = [
 function isOperant(L){ return L && L.startReadiness!=null; }
 function drillEmit(R,S,L){ const g=L.emitGamma, k=L.emitK; const rp=Math.pow(Math.max(0,R),g), sp=Math.pow(Math.max(0,S),g), kp=Math.pow(k,g); return rp/(rp+sp+kp); }
 let levelIdx=0, maxUnlocked=0;
-try{ const m=+localStorage.getItem('keeperMax'); if(m>=0) maxUnlocked=Math.min(m,LEVELS.length-1); }catch(e){}
-function saveProgress(){ try{ localStorage.setItem('keeperMax',String(maxUnlocked)); }catch(e){} }
+// persistent save: the harbor economy + progress, as one versioned JSON blob. Migrates the old bare keeperMax once.
+function defaultSave(){ return { v:1, money:0, hulls:5, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, maxUnlocked:0, tutDone:false }; }
+let save = defaultSave();
+try{
+  const raw = localStorage.getItem('keeperSave');
+  if(raw){ const o=JSON.parse(raw); if(o && typeof o==='object') save=Object.assign(defaultSave(), o); }
+  else { const m=+localStorage.getItem('keeperMax'); if(m>=0) save.maxUnlocked=Math.min(m,LEVELS.length-1); }   // migrate legacy progress
+}catch(e){}
+maxUnlocked = save.maxUnlocked||0;
+function saveProgress(){ save.maxUnlocked=maxUnlocked; try{ localStorage.setItem('keeperSave',JSON.stringify(save)); }catch(e){} }
+/* ============================ THE HARBOR ECONOMY ============================ */
+// Money is banked ONLY on a won season, and it comes mostly from the wage plus bonuses for reading the crew
+// right and bringing boats home -- both of which require conditioning the crew. Surplus fish are a capped topping.
+const ECON = { WAGE_BASE:20, MUSTER_COIN:4, HULL_COIN:3, FISH_COIN:2, storageCaps:[10,20,35,55,80] };
+function storageCap(){ return ECON.storageCaps[Math.min(ECON.storageCaps.length-1, save.storageTier||0)]||10; }
+function adMult(){ return 1 + 0.3*(save.adTier||0); }
+function computePayout(){
+  const L=G.lev, tgt=L.catchTarget||0;
+  const surplus = Math.max(0, (G.catch||0) - tgt);
+  const sold = Math.min(surplus, storageCap());
+  const wage = Math.round(ECON.WAGE_BASE*(1 + 0.3*levelIdx));
+  const musterCoin = ECON.MUSTER_COIN*(G.musterRight||0);
+  const hullCoin = ECON.HULL_COIN*(G.boats||0);        // boats brought home: reward for warning well
+  const fishCoin = Math.round(sold*ECON.FISH_COIN*adMult());
+  return { wage, musterCoin, hullCoin, fishCoin, sold, spoiled:Math.max(0,surplus-sold), total: wage+musterCoin+hullCoin+fishCoin };
+}
+function updateCoins(){ const c=$('coins'), v=$('coinVal'); if(!c||!v) return; v.textContent=save.money; c.hidden=!(save.money>0 || save.tutDone); }
+// THE CHANDLERY: every item sharpens perception, protects the fleet, or raises the wage. None buys the crew's
+// belief in the lamp -- that is earned, not bought. Each carries a one-line lesson tying it to a real idea.
+function shopItems(){ return [
+  { key:'pollTier', name:'The Gazette', sub: save.pollTier>=1?'a weekly poll':'not yet subscribed',
+    cost: save.pollTier<1?15:null, gated:false,
+    effect: save.pollTier>=1?'You can read the crew’s belief on the meter.':'Reveals the belief meter, a read on how far the crews trust your lamp.',
+    teach:'You cannot see trust directly, so you pay for a poll that measures it. Turning a hidden idea into a number you can track is what psychologists call operationalizing it.' },
+  { key:'instrTier', name:'The Storm-Glass', sub:['none yet','a storm-glass','a barometer','a radar'][save.instrTier]||'a radar',
+    cost:[40,70,110][save.instrTier]!=null?[40,70,110][save.instrTier]:null,
+    gated: save.instrTier===2 && maxUnlocked<2,
+    effect:'Your read of the sky: '+['plain and noisy','sharper','sharper still','the clearest a keeper can buy'][save.instrTier],
+    teach:'A better instrument tells the storm’s signal from the noise in the sky. Psychologists call that sensitivity, and a sharper tool raises it, though it never makes you certain.' },
+  { key:'hulls', name:'Another Boat', sub: save.hulls+' in your fleet',
+    cost: save.hulls<8? (20 + 8*Math.max(0,save.hulls-5)) : null, gated:false,
+    effect: save.hulls+' boats. Lose them all in a season and it ends.',
+    teach:'More boats, and a missed storm costs you less. How much a miss costs is exactly what should set how cautious you are about crying wolf.' },
+  { key:'storageTier', name:'The Ice Cellar', sub:'holds '+[10,20,35,55,80][save.storageTier]+' fish',
+    cost:[25,45,70,100][save.storageTier]!=null?[25,45,70,100][save.storageTier]:null, gated:false,
+    effect:'Keep up to '+[10,20,35,55,80][save.storageTier]+' surplus fish per season; the rest spoil.',
+    teach:'A bigger cellar banks more of the surplus you land before it spoils. The reward you can keep is its value, and value past what you can hold is simply lost.' },
+  { key:'adTier', name:'The Criers', sub:(1+0.3*save.adTier).toFixed(1)+'x on surplus',
+    cost:[30,55,90][save.adTier]!=null?[30,55,90][save.adTier]:null, gated:false,
+    effect:'Surplus fish sell for '+(1+0.3*save.adTier).toFixed(1)+'x their usual coin.',
+    teach:'Criers call your catch through the market so each fish sells for more. Money is your own reward for keeping the lamp honest, and this raises how much that reward is worth.' },
+]; }
+function buyItem(key){
+  const it = shopItems().find(x=>x.key===key);
+  if(!it || it.cost==null || it.gated || save.money < it.cost) return;
+  save.money -= it.cost;
+  if(key==='hulls') save.hulls = Math.min(8, (save.hulls||5)+1);
+  else save[key] = (save[key]||0) + 1;
+  audioOn(); if(!playSnd('page_turn',0.45)) {}
+  saveProgress(); renderShop();
+}
+function renderShop(){
+  overlayWrap.hidden=false; overlayWrap.classList.remove('titlescreen'); overlay.style.cssText='';
+  showBgVideo(false); theme(true);
+  const cards = shopItems().map(it=>`<div class="shopitem">
+    <div class="si-head"><span class="si-name">${it.name}</span><span class="small si-sub">${it.sub}</span></div>
+    <div class="si-effect">${it.effect}</div>
+    <div class="si-teach"><span class="si-lab">the psychology</span> ${it.teach}</div>
+    <div class="si-foot">${
+      it.cost==null ? '<span class="si-owned">Fully upgraded</span>'
+      : it.gated ? '<span class="si-locked">🔒 clear more seasons to unlock</span>'
+      : '<button class="btn si-btn" type="button" data-buy="'+it.key+'"'+(save.money<it.cost?' disabled':'')+'>Buy &nbsp;·&nbsp; 🪙 '+it.cost+'</button>'
+    }</div></div>`).join('');
+  overlay.innerHTML = `<div style="text-align:center;margin:-2px 0 8px"><div style="font-family:'Cinzel',serif;font-weight:700;font-size:24px;letter-spacing:1px;color:#9a7b2e">The Chandlery</div>
+      <div class="small" style="font-weight:800;color:#2c5b66">You hold 🪙 <b id="shopCoins">${save.money}</b> coins</div></div>
+    <p class="prose" style="font-size:14.5px">Everything here sharpens how you read the sky, protects your fleet, or raises your wage. None of it buys the crew’s belief in your lamp, which you earn one honest night at a time.</p>
+    <div class="shopgrid">${cards}</div>
+    <div style="margin-top:12px"><button class="btn" id="bShopBack" type="button">⚓ Back to the harbor</button></div>`;
+  overlay.querySelectorAll('[data-buy]').forEach(b=> b.onclick=()=>buyItem(b.getAttribute('data-buy')));
+  $('bShopBack').textContent = (_shopReturn==='tutorial') ? 'Done. Set sail ▸' : '⚓ Back to the harbor';
+  $('bShopBack').onclick=()=>{ if(_shopReturn==='tutorial'){ _shopReturn=null; save.pollTier=Math.max(1,save.pollTier); saveProgress(); tutIx++; state='tutorial'; renderTutorial(); } else { state='menu'; renderOverlay(); } };
+  updateCoins();
+}
+/* ============================ THE TUTORIAL (Season 1 prologue: "Earn the Lamp") ============================ */
+// A scripted, character-driven onboarding. The player FEELS the problem (a correct warning ignored) before the
+// psychology explains it, then the salary -> shop -> Gazette chain introduces money and reveals the belief meter.
+// Draws no RNG and no deck card; the counted season starts fresh after it. Skipped in TESTMODE and once tutDone.
+let tutIx=0, tutStorm=false, _shopReturn=null;
+const TUT=[
+  { who:'previous', name:'The old keeper',
+    line:'I lit the lamp for every little squall, until no one looked up when it burned. The tower is yours now, and what little trust the crews have left comes with it.' },
+  { who:'marisol', name:'Marisol, the harbormaster',
+    line:'You keep the light now. When a storm is coming, you light the lamp, and the crews stay off the water where it is safe.' },
+  { who:'marisol', name:'Marisol',
+    line:'But a crew that stays in every night lands no fish, and a town with no fish does not last the winter. Some nights you have to let them sail.' },
+  { who:'marisol', name:'Marisol', act:'light',
+    line:'A bad storm is coming tonight, for certain. Light the lamp and call the crews in.' },
+  { who:'odell', name:'Captain Odell', storm:true,
+    line:'The last keeper burned that lamp every night. We fish. ... The storm rolls in over the open water, and one of your boats does not come home.' },
+  { who:'marisol', name:'Marisol',
+    line:'You did nothing wrong. They simply do not believe the lamp yet. The keeper before you lit it on calm nights until it stopped meaning anything at all.' },
+  { who:'marisol', name:'Marisol',
+    line:'Years ago a man named Pavlov rang a bell just before he fed his dogs. After enough meals, the bell by itself made them drool, with no food in sight.' },
+  { who:'marisol', name:'Marisol', link:true,
+    line:'Your lamp is that bell, and the storm is the food. Warn the crews true, night after night, and in time the lamp alone will hold them ashore.' },
+  { who:'marisol', name:'Marisol', act:'salary',
+    line:'You win that belief back one honest night at a time. Here is an advance on your wage to begin with.' },
+  { who:'marisol', name:'Marisol', act:'shop',
+    line:'Take it to the chandlery. Buy the Gazette, so you can read where the crews’ belief stands, and spend the rest as you see fit before the season.' },
+  { who:'marisol', name:'Marisol', act:'begin',
+    line:'Good. That bar is the crews’ belief in your lamp. Above the line they heed it and stay in; below it, they sail. Read it, warn them true, and feed the town.' },
+];
+function startTutorial(){ state='tutorial'; tutIx=0; tutStorm=false; _shopReturn=null;
+  save.money=0; save.pollTier=0; G=null; overlayWrap.hidden=false; showBgVideo(false); renderTutorial(); }
+function renderTutorial(){
+  const b=TUT[tutIx]; if(!b){ save.tutDone=true; saveProgress(); levelIdx=0; startLevel(); return; }
+  tutStorm=!!b.storm;
+  overlayWrap.hidden=false; overlayWrap.classList.add('titlescreen'); overlay.style.cssText=''; updateCoins();
+  const linkHTML = b.link? '<div style="margin-top:8px"><a href="'+LEVELS[0].story.url+'" target="_blank" rel="noopener" style="color:#f5d98a;font-weight:800;font-size:13px">Read the whole story of Pavlov’s dogs ↗</a></div>':'';
+  let label = 'Continue ▸';
+  if(b.act==='light') label='Light the lamp';
+  else if(b.act==='shop') label='Open the chandlery';
+  else if(b.act==='begin') label='Begin the season';
+  const btnBg = (b.act==='light')?'background:linear-gradient(180deg,#f5c14e,#d8a13a);color:#3a2a08'
+    : (b.act==='shop')?'background:linear-gradient(180deg,#caa24a,#9a7b2e)':'';
+  overlay.innerHTML = `<div class="titlecard" style="max-width:480px">
+    <img src="assets/portrait_${b.who}.webp" alt="${b.name}" style="width:98px;height:98px;border-radius:50%;object-fit:cover;border:3px solid var(--lampDk);box-shadow:0 3px 16px rgba(0,0,0,.55)" onerror="this.style.display='none'">
+    <div class="small" style="margin-top:7px;font-weight:800;letter-spacing:.4px;color:#e9eefb;text-shadow:0 1px 6px rgba(0,0,0,.8)">${b.name}</div>
+    <p class="hook" style="font-size:17px;font-style:normal;color:#f2f5fc;max-width:440px;margin:12px auto 0">${b.line}</p>
+    ${linkHTML}
+    <div style="margin-top:18px"><button class="bigbtn" id="tutBtn" type="button" style="${btnBg}">${label}</button></div>
+    <div class="small" style="margin-top:12px;color:#aeb6c8">${tutIx+1} of ${TUT.length}</div>
+  </div>`;
+  $('tutBtn').onclick=()=>tutAct(b);
+}
+function tutAct(b){
+  audioOn();
+  if(b.act==='salary'){ save.money=90; saveProgress(); }
+  if(b.act==='shop'){ _shopReturn='tutorial'; state='shop'; renderShop(); return; }
+  if(b.act==='begin'){ save.tutDone=true; save.pollTier=Math.max(1,save.pollTier); saveProgress(); levelIdx=0; startLevel(); return; }
+  tutIx++; renderTutorial();
+}
 /* ============================ STATE ============================ */
 const canvas=document.getElementById('stage'), ctx=canvas.getContext('2d');
 const overlay=document.getElementById('panel'), overlayWrap=document.getElementById('overlay');
@@ -506,7 +672,7 @@ function newGame(idx){
   const L=LEVELS[levelIdx];
   rng = mulberry32(((Math.random()*1e9)|0)||7);
   auxRng = mulberry32(((Math.random()*1e9)|0)||101);   // isolated probe/mini-game stream (never touches the deck/gauge/dock sequence)
-  G = { lev:L, night:1, boats:L.startBoats, trust:(L.startTrust!=null?L.startTrust:(L.startReadiness||0)), catch:0,
+  G = { lev:L, night:1, boats:(isOperant(L)? L.startBoats : (save.hulls||L.startBoats)), trust:(L.startTrust!=null?L.startTrust:(L.startReadiness||0)), catch:0,
         decided:false, lit:false, outcome:null, log:[], stats:{hit:0,fa:0,miss:0,cr:0},
         weatherStorm:false, crewOut:false, sky:0, finale:false, inQuiet:false,
         isMuster:false, musterAnswered:false, musterCall:null, musterRight:0, musterCount:0, lastMuster:null,
@@ -539,9 +705,7 @@ function newGame(idx){
 function rollNight(){
   G.decided=false; G.outcome=null; G.lit=false; G.moored=null; G.decoyMoored=null; G.musterPhase=0; G.reinforced=null;
   G.musterAnswered=false; G.musterCall=null; G.lastMuster=null;
-  G.coach=null;   // onboarding notes live for one night only
-  if(G.onboard && G.night>=2 && !G.reveal.belief){ G.reveal.belief=true;   // the belief meter appears once there is something to show on it
-    G.coach='The bar above is the crew’s belief in your lamp, hidden until now. It moves a little every night, up when a warning proves true and down when it comes to nothing.'; }
+  G.coach=null;   // onboarding notes live for one night only (the belief meter is now the Gazette purchase, revealed in the tutorial)
   const L=G.lev, last = G.night===L.nights;
   G.finale = last;
   G.inQuiet = !!(L.quiet && G.night>=L.quiet[0] && G.night<=L.quiet[1]);
@@ -561,7 +725,10 @@ function rollNight(){
   G.isDecoy = L.decoyNights ? (last ? true : !!(G.decoyDeck && G.decoyDeck[G.night-1])) : false;
   if(G.isDecoy && !G.decoySeeded){ G.vMinus = L.genInit*L.startTrust; G.decoySeeded=true; }   // generalization seed (from the belief carried in)
   // the gauge is a class-conditional reading of the true card (signal detection, d'=1.85)
-  G.sky = last ? 0.99 : Math.max(0.02, Math.min(0.98, (G.weatherStorm?CONFIG.gaugeStorm:CONFIG.gaugeCalm) + gauss()*CONFIG.gaugeSd));
+  if(last){ G.sky = 0.99; }
+  else { const base = G.weatherStorm?CONFIG.gaugeStorm:CONFIG.gaugeCalm;
+    const raw = base + gauss()*CONFIG.gaugeSd;               // primary read on rng -- deck/gauge sequence preserved
+    G.sky = Math.max(0.02, Math.min(0.98, skyRefine(raw, base))); }   // the storm instrument sharpens it via auxRng
   G.heedP = heedProb(G.trust, L.heedThreshold);
   G.heedTendency = G.trust >= L.heedThreshold;
   G.decoyTendency = G.vMinus >= L.heedThreshold;
@@ -651,7 +818,7 @@ function decide(arg){
     if(lit){
       // CO-LIGHT: your lamp beside Sefu's; the crew cannot tell which light the weather answered
       const blend = 0.5*G.trust + 0.5*G.vMinus + 6;
-      moored = binom(Math.min(G.boats,CONFIG.crewN), heedProb(blend,thresh)); heedNow = moored>=4;
+      moored = binom(CONFIG.crewN, heedProb(blend,thresh)); heedNow = moored>=4;
       G.moored=moored; G.mooredHistory.push(moored);
       if(storm){ dTrust = L.aBlur*(100-G.trust); dVMinus = L.aBlur*(100-G.vMinus); kind='hit';
         if(heedNow){ head='Both lights, and a storm.'; body=moored+' of seven made the harbor fast, and the storm passed over empty water. But they moored to the pair of lights, not to yours alone.'; }
@@ -660,7 +827,7 @@ function decide(arg){
         head='Both lights, no storm.'; body='You lit your lamp beside Sefu’s and no storm came. With two lights burning, the crew cannot tell which one to stop believing.'; }
     } else {
       // STAND CLEAR: only Sefu's lantern burns, and the crew reads it alone
-      const dm = binom(Math.min(G.boats,CONFIG.crewN), heedProb(G.vMinus,thresh));
+      const dm = binom(CONFIG.crewN, heedProb(G.vMinus,thresh));
       G.decoyMoored=dm; G.decoyMooredHistory.push(dm);
       if(storm){ dTrust=-CONFIG.aMiss*G.trust; kind='miss'; lostBoat=true; G.boats=Math.max(0,G.boats-1);
         head='A storm slipped in.'; body='Sefu’s lantern was never a warning, and a boat was caught out with your lamp dark.'; }
@@ -671,7 +838,7 @@ function decide(arg){
     G.crewOut = !(lit && heedNow);
   } else {
     // SEASON 1/2: a single light (unchanged)
-    if(lit){ moored=binom(Math.min(G.boats,CONFIG.crewN), G.heedP); heedNow = moored>=4;
+    if(lit){ moored=binom(CONFIG.crewN, G.heedP); heedNow = moored>=4;
       G.moored=moored; G.mooredHistory.push(moored); }
     G.crewOut = !(lit && heedNow);
     if(lit && storm){
@@ -914,6 +1081,7 @@ function proceed(){ if(state!=='resolved') return;
 }
 function nextNight(){ proceed(); }
 function endGame(won,reason){ state = won?'won':'lost'; G.endReason=reason||(won?'win':'boats');
+  if(won){ G.payout=computePayout(); if(!TESTMODE){ save.money += G.payout.total; } }   // banked only on a win, never in the battery
   (won?snd.good:snd.bad)(); if(!playSnd('foghorn',0.5)) snd.foghorn(); playSnd('page_turn',0.35); renderOverlay(); }
 /* ============================ UI RENDER (DOM) ============================ */
 const $=id=>document.getElementById(id);
@@ -974,6 +1142,7 @@ function nightLogTable(){
 function renderDecision(){
   $('wrap').classList.add('playing');
   { const bm=$('bMenu'); if(bm) bm.hidden=false; }
+  updateCoins();
   const L=G.lev, op=isOperant(L);
   const coachHTML = G.coach ? '<div style="margin-top:7px;color:#f5d98a;background:rgba(245,193,78,.10);border:1px solid rgba(245,193,78,.42);border-radius:8px;padding:7px 11px;font-family:\'Spectral\',serif;font-size:13px;line-height:1.5;text-align:left">'+G.coach+'</div>' : '';
   if(G.onboard){   // Season 1: the labels appear one at a time, as each first matters
@@ -1007,7 +1176,7 @@ function renderDecision(){
   else if(G.finale){ dc.hidden=false; dc.innerHTML='<b>The night of the Deep.</b>'; }
   else dc.hidden=true;
   renderBelief();
-  $('belief').hidden = (G.onboard && !G.reveal.belief);   // the meter appears once the crew have started to learn
+  $('belief').hidden = !(save.pollTier>=1);   // the belief meter is the Gazette poll: you must buy it to see the crew's trust
   $('log').innerHTML = G.log.slice(-12).map(k=>{
     const t={hit:'right',fa:'cried wolf',miss:'missed',cr:'calm',coFa:'both lit',decoyClear:'stood clear',reinDrill:'rewarded',holdDrill:'held',reinRitual:'mis-rewarded',holdRitual:'saved'}[k]||'·';
     const cls={coFa:'fa',decoyClear:'cr',reinDrill:'hit',holdDrill:'miss',reinRitual:'fa',holdRitual:'cr'}[k]||k;
@@ -1217,6 +1386,8 @@ function renderOverlay(){
   if(!(state==='won'||state==='lost')) _slides=null;   // leave slideshow mode
   $('wrap').classList.remove('playing');
   { const bm=$('bMenu'); if(bm) bm.hidden=true; }
+  updateCoins();
+  if(state==='shop'){ renderShop(); return; }
   overlayWrap.hidden = !(state==='title'||state==='menu'||state==='won'||state==='lost');
   overlayWrap.classList.toggle('titlescreen', state==='title');
   showBgVideo(state==='title','menu_loop');
@@ -1234,7 +1405,9 @@ function renderOverlay(){
         <p>The lamp is yours now. What is left of their trust comes with it.</p>
       </div>
       <button class="bigbtn" id="bBegin" type="button">Take the post</button></div>`;
-    $('bBegin').onclick=()=>{ audioOn(); theme(true); overlay.style.cssText=''; state='menu'; renderOverlay(); };
+    $('bBegin').onclick=()=>{ audioOn(); theme(true); overlay.style.cssText='';
+      if(!TESTMODE && !save.tutDone && levelIdx===0){ startTutorial(); }   // first-time players get the prologue
+      else { state='menu'; renderOverlay(); } };
     return;
   }
   overlay.style.cssText='';
@@ -1256,14 +1429,16 @@ function renderOverlay(){
         : 'Light the lamp <b>(L)</b> or leave it dark <b>(D)</b>. At a muster, they will heed <b>(R)</b> or they will not <b>(W)</b>. <b>Space</b> moves on.'}</p>
       <div style="margin-top:4px">
         <button class="btn" id="bStart" type="button">${L.id===1?'Light the first night':'Begin the season'}</button>
+        <button class="btn" id="bShop" type="button" style="background:linear-gradient(180deg,#caa24a,#9a7b2e);margin-left:8px">🪙 The chandlery</button>
         ${levelIdx>0?'<button class="btn" id="bPrev" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">◀ Earlier season</button>':''}
         ${levelIdx<LEVELS.length-1?'<button class="btn" id="bFwd" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">Later season ▶</button>':''}
       </div>
       <p class="small" style="margin-top:10px;color:#7a7282">Every season stands on its own, so you can jump to any of the four from here.${maxUnlocked>0?' &nbsp;·&nbsp; <a href="#" id="bReset" style="color:#9a6a4a">Reset progress</a>':''}</p>`;
     $('bStart').onclick=startLevel;
+    if($('bShop')) $('bShop').onclick=()=>{ state='shop'; renderOverlay(); };
     if($('bPrev')) $('bPrev').onclick=()=>{ levelIdx=Math.max(0,levelIdx-1); renderOverlay(); };
     if($('bFwd')) $('bFwd').onclick=()=>{ levelIdx=Math.min(LEVELS.length-1,levelIdx+1); renderOverlay(); };
-    if($('bReset')) $('bReset').onclick=(e)=>{ e.preventDefault(); maxUnlocked=0; try{localStorage.removeItem('keeperMax');}catch(_){} levelIdx=0; renderOverlay(); };
+    if($('bReset')) $('bReset').onclick=(e)=>{ e.preventDefault(); maxUnlocked=0; save=defaultSave(); try{localStorage.removeItem('keeperMax');localStorage.removeItem('keeperSave');}catch(_){} levelIdx=0; renderOverlay(); };
     return;
   }
   const s=G.stats, won=state==='won', why=G.endReason||'boats';
@@ -1342,6 +1517,7 @@ function renderOverlay(){
   maxUnlocked=Math.max(maxUnlocked, Math.min(levelIdx+1, LEVELS.length-1)); saveProgress();
   const hasNext = levelIdx+1 < LEVELS.length;
   const sefu = (L.id===2)? `<p style="color:#6a5a2e">A peddler named Sefu has set a lantern stall on the dock. Some nights, from the water, his light looks like yours.</p>` : '';
+  const pay = G.payout || computePayout();
   const winSlides=[
     { kicker:'The season turns', title:titles.win, visual:imgSlide('bg_dawn.webp','dawn over the harbor'),
       body:`<p>${leads.win}</p>${L.back?`<p style="color:#6a5a2e">${L.back}</p>`:''}` },
@@ -1352,15 +1528,26 @@ function renderOverlay(){
       body:`<p>${L.debrief.body}</p>${conceptMap(L)}<p>${youWatched}</p>` },
     { kicker:'The season, night by night', title:'', visual:'',
       body:`${nightLogTable()}${statline}${mirror}` },
+    { kicker:'Payday', title:'The town shares its catch', visual:imgSlide('coast_map.webp','the harbor'),
+      body:`<p>A season kept safe pays. You earn a keeper's wage, a bonus for reading the crew right and for every boat you brought home, and coin for the surplus fish the town bought past what it needed to eat.</p>
+      <div class="kfacts">
+        <span class="k">wage +${pay.wage}</span>
+        <span class="k">read the crew +${pay.musterCoin}</span>
+        <span class="k">boats home +${pay.hullCoin}</span>
+        ${pay.fishCoin? '<span class="k">surplus fish +'+pay.fishCoin+'</span>':''}
+      </div>
+      <p><b>+${pay.total} coins.</b> You now hold <b>🪙 ${save.money}</b>.${pay.spoiled? ' <span class="small">('+pay.spoiled+' fish spoiled past your storage; a bigger cellar would keep more.)</span>':''}</p>
+      <p class="small">Spend it at the chandlery to sharpen your read of the sky, keep more boats afloat, or measure what you cannot see.</p>` },
     { kicker:'Carry it off the coast', title:'', visual:'',
       body:`<p>${L.debrief.transfer}</p>${sefu}<p class="small">Read more: <a href="${L.debrief.url}" target="_blank" rel="noopener">the psychology behind this season</a> (opens in a new tab).</p>`,
       actions:`${hasNext
         ? `<button class="btn" id="bNext" type="button">Next: ${LEVELS[levelIdx+1].name} ▶</button> <button class="btn" id="bAgain" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">Replay</button>`
-        : `<button class="btn" id="bAgain" type="button">Take this season again</button>`} <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">⚓ Harbor</button>` },
+        : `<button class="btn" id="bAgain" type="button">Take this season again</button>`} <button class="btn" id="bShopWin" type="button" style="background:linear-gradient(180deg,#caa24a,#9a7b2e)">🪙 Shop</button> <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">⚓ Harbor</button>` },
   ];
   renderSlides(winSlides, (ix,last)=>{ if(last){
     if($('bNext')) $('bNext').onclick=()=>{ levelIdx++; state='menu'; renderOverlay(); };
     if($('bAgain')) $('bAgain').onclick=startLevel;
+    if($('bShopWin')) $('bShopWin').onclick=()=>{ state='shop'; renderOverlay(); };
     if($('bHarbor')) $('bHarbor').onclick=()=>{ state='menu'; renderOverlay(); };
   }});
 }
@@ -1420,6 +1607,11 @@ function drawScene(){
     else if(state==='won' && IMG.bg_dawn) drawCover(IMG.bg_dawn);
     else drawAmbient();
     return; }
+  if(state==='tutorial'||state==='shop'){ ctx.clearRect(0,0,W,H);
+    if(state==='tutorial' && tutStorm && IMG.bg_storm){ drawCover(IMG.bg_storm); ctx.fillStyle='rgba(10,14,24,.40)'; ctx.fillRect(0,0,W,H); }
+    else if(IMG.bg_dusk||IMG.bg_starlit){ drawCover(IMG.bg_dusk||IMG.bg_starlit); ctx.fillStyle='rgba(10,16,28,.34)'; ctx.fillRect(0,0,W,H); }
+    else drawAmbient();
+    return; }
   ctx.clearRect(0,0,W,H);
   if(G && G.probePhase===1 && G.probeScene){ drawProbeScene(); return; }
   const storm = (state==='resolved' && G && G.outcome && G.outcome.storm && G.beat===2);
@@ -1475,7 +1667,7 @@ function drawScene(){
   } else {
   // the dock: crews that moored stand by the lamp side; the rest walk to the boats
   if(G && G.decided && G.moored!=null){
-    const k=G.moored, n=Math.min(G.boats,CONFIG.crewN);
+    const k=G.moored, n=CONFIG.crewN;   // the seven crew (people), decoupled from the hull count
     for(let i=0;i<n;i++){
       const moor=i<k;
       const t=motionOK? Math.min(1,(animTime%1000)):1;
@@ -1541,13 +1733,16 @@ addEventListener('keydown',e=>{ const k=e.key.toLowerCase();
       if(k==='l'||k===' '){ e.preventDefault(); decide(true); } else if(k==='d'){ e.preventDefault(); decide(false); }
     }
   } else if(state==='resolved'){ if(k===' '||k==='enter'){ e.preventDefault(); if(!G.beat||G.beat===2) nextNight(); } }
-  else if(state==='won'||state==='lost'){ if(slideKey(k)) e.preventDefault(); } });
+  else if(state==='won'||state==='lost'){ if(slideKey(k)) e.preventDefault(); }
+  else if(state==='tutorial'){ if(k===' '||k==='enter'){ e.preventDefault(); const b=$('tutBtn'); if(b) b.click(); } } });
 ['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{ audioOn(); if(state==='title'||state==='menu') theme(true); },{once:true}));
 levelIdx=0; fit(); renderOverlay(); requestAnimationFrame(frame);
 /* test seam */
 window.keeper={
   get state(){return state;}, get level(){return levelIdx;},
   get testMode(){return TESTMODE;}, set testMode(v){ TESTMODE=!!v; },
+  get save(){return save;},   // battery can equip shop tiers: keeper.save.instrTier=3
+  resetSave(){ save=defaultSave(); },
   snapshot(){ return G?{ night:G.night, nights:G.lev.nights, boats:G.boats, trust:+(G.trust||0).toFixed(1), thresh:G.lev.heedThreshold,
       catch:G.catch, target:G.lev.catchTarget, sky:+(G.sky||0).toFixed(2), storm:G.weatherStorm, inQuiet:G.inQuiet,
       isMuster:G.isMuster, musterAnswered:G.musterAnswered, musterCall:G.musterCall, musterPhase:G.musterPhase, finale:G.finale,
@@ -1559,6 +1754,7 @@ window.keeper={
       readiness:+(G.readiness||0).toFixed(1), ritualStrength:+(G.ritual||0).toFixed(1), drilled:G.drilled,
       drillTendency:G.drillTendency, rations:G.rations, operant:isOperant(G.lev),
       probeHistory:G.probeHistory.slice(), lastProbe:G.lastProbe, probePhase:G.probePhase,
+      money:save.money, payout:(G.payout?G.payout.total:0),
       reason:G.endReason||null, stats:Object.assign({},G.stats) }:null; },
   start(idx){ newGame(idx==null?levelIdx:idx); state='reading'; overlayWrap.hidden=true; renderDecision(); },
   muster, decide, next:nextNight,
