@@ -1453,6 +1453,15 @@ function slideKey(k){
   return false;
 }
 /* ============================ OVERLAYS ============================ */
+// wipe all saved progress and drop back to the very top (the title), so the intro and onboarding replay.
+function resetProgress(){ maxUnlocked=0; save=defaultSave();
+  try{ localStorage.removeItem('keeperMax'); localStorage.removeItem('keeperSave'); }catch(_){}
+  levelIdx=0; G=null; state='title'; renderOverlay(); }
+// two-click guard so a stray tap on the small reset link cannot erase a student's progress.
+function armReset(a){ if(!a) return;
+  if(a.dataset.armed==='1'){ resetProgress(); return; }
+  a.dataset.armed='1'; const t=a.textContent; a.textContent='Click again to erase all progress';
+  setTimeout(()=>{ if(a && a.isConnected){ a.dataset.armed='0'; a.textContent=t; } }, 4000); }
 function renderOverlay(){
   if(!(state==='won'||state==='lost')) _slides=null;   // leave slideshow mode
   $('wrap').classList.remove('playing');
@@ -1475,10 +1484,12 @@ function renderOverlay(){
         <p>The night they stopped believing him, the sea took four boats.</p>
         <p>The lamp is yours now. What is left of their trust comes with it.</p>
       </div>
-      <button class="bigbtn" id="bBegin" type="button">Take the post</button></div>`;
+      <button class="bigbtn" id="bBegin" type="button">${save.tutDone?'Enter the harbor':'Take the post'}</button>
+      ${save.tutDone?'<div style="margin-top:12px"><a href="#" id="bTitleReset" style="color:#c9b48f;font-size:13px;text-decoration:underline">Start over from the beginning</a></div>':''}</div>`;
     $('bBegin').onclick=()=>{ audioOn(); theme(true); overlay.style.cssText='';
       if(!TESTMODE && !save.tutDone && levelIdx===0){ startTutorial(); }   // first-time players get the prologue
       else { state='menu'; renderOverlay(); } };
+    if($('bTitleReset')) $('bTitleReset').onclick=(e)=>{ e.preventDefault(); armReset($('bTitleReset')); };
     return;
   }
   overlay.style.cssText='';
@@ -1504,12 +1515,12 @@ function renderOverlay(){
         ${levelIdx>0?'<button class="btn" id="bPrev" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">◀ Earlier season</button>':''}
         ${levelIdx<LEVELS.length-1?'<button class="btn" id="bFwd" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">Later season ▶</button>':''}
       </div>
-      <p class="small" style="margin-top:10px;color:#7a7282">Every season stands on its own, so you can jump to any of the four from here.${maxUnlocked>0?' &nbsp;·&nbsp; <a href="#" id="bReset" style="color:#9a6a4a">Reset progress</a>':''}</p>`;
+      <p class="small" style="margin-top:10px;color:#7a7282">Every season stands on its own, so you can jump to any of the four from here.${(save.tutDone||maxUnlocked>0)?' &nbsp;·&nbsp; <a href="#" id="bReset" style="color:#9a6a4a">Start over from the beginning</a>':''}</p>`;
     $('bStart').onclick=startLevel;
     if($('bShop')) $('bShop').onclick=()=>{ state='shop'; renderOverlay(); };
     if($('bPrev')) $('bPrev').onclick=()=>{ levelIdx=Math.max(0,levelIdx-1); renderOverlay(); };
     if($('bFwd')) $('bFwd').onclick=()=>{ levelIdx=Math.min(LEVELS.length-1,levelIdx+1); renderOverlay(); };
-    if($('bReset')) $('bReset').onclick=(e)=>{ e.preventDefault(); maxUnlocked=0; save=defaultSave(); try{localStorage.removeItem('keeperMax');localStorage.removeItem('keeperSave');}catch(_){} levelIdx=0; renderOverlay(); };
+    if($('bReset')) $('bReset').onclick=(e)=>{ e.preventDefault(); armReset($('bReset')); };
     return;
   }
   const s=G.stats, won=state==='won', why=G.endReason||'boats';
