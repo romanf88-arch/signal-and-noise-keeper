@@ -527,12 +527,12 @@ function isOperant(L){ return L && L.startReadiness!=null; }
 function drillEmit(R,S,L){ const g=L.emitGamma, k=L.emitK; const rp=Math.pow(Math.max(0,R),g), sp=Math.pow(Math.max(0,S),g), kp=Math.pow(k,g); return rp/(rp+sp+kp); }
 let levelIdx=0, maxUnlocked=0;
 // persistent save: the harbor economy + progress, as one versioned JSON blob. Migrates the old bare keeperMax once.
-function defaultSave(){ return { v:1, money:0, hulls:5, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, maxUnlocked:0, tutDone:false, uiTaught:false }; }
+const SAVE_V = 2;   // bump this when the save shape changes; older saves are wiped so the new intro runs fresh
+function defaultSave(){ return { v:SAVE_V, money:0, hulls:5, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, maxUnlocked:0, tutDone:false, uiTaught:false }; }
 let save = defaultSave();
 try{
   const raw = localStorage.getItem('keeperSave');
-  if(raw){ const o=JSON.parse(raw); if(o && typeof o==='object') save=Object.assign(defaultSave(), o); }
-  else { const m=+localStorage.getItem('keeperMax'); if(m>=0) save.maxUnlocked=Math.min(m,LEVELS.length-1); }   // migrate legacy progress
+  if(raw){ const o=JSON.parse(raw); if(o && typeof o==='object' && o.v===SAVE_V) save=Object.assign(defaultSave(), o); }   // stale-version saves are discarded (fresh start)
 }catch(e){}
 maxUnlocked = save.maxUnlocked||0;
 function saveProgress(){ save.maxUnlocked=maxUnlocked; try{ localStorage.setItem('keeperSave',JSON.stringify(save)); }catch(e){} }
@@ -560,10 +560,11 @@ function shopItems(){ return [
     cost: save.pollTier<1?15:null, gated:false,
     effect: save.pollTier>=1?'You can read the crew’s belief on the meter.':'Reveals the belief meter, a read on how far the crews trust your lamp.',
     teach:'You cannot see trust directly, so you pay for a poll that measures it. Turning a hidden idea into a number you can track is what psychologists call operationalizing it.' },
-  { key:'instrTier', name:'The Storm-Glass', sub:['none yet','a storm-glass','a barometer','a radar'][save.instrTier]||'a radar',
+  { key:'instrTier', name:'The Barometer', sub:['not owned','a barometer','an upgraded glass','a radar'][save.instrTier]||'a radar',
     cost:[40,70,110][save.instrTier]!=null?[40,70,110][save.instrTier]:null,
     gated: save.instrTier===2 && maxUnlocked<2,
-    effect:'Your read of the sky: '+['plain and noisy','sharper','sharper still','the clearest a keeper can buy'][save.instrTier],
+    effect: save.instrTier===0 ? 'Adds a dial that reads the sky, plus a sharper read. Without it you go on the weather in words alone.'
+      : 'Your read of the sky: '+['','clear','sharper still','the clearest a keeper can buy'][save.instrTier],
     teach:'A better instrument tells the storm’s signal from the noise in the sky. Psychologists call that sensitivity, and a sharper tool raises it, though it never makes you certain.' },
   { key:'hulls', name:'Another Boat', sub: save.hulls+' in your fleet',
     cost: save.hulls<8? (25 + 10*Math.max(0,save.hulls-5)) : null, gated:false,
@@ -594,8 +595,8 @@ const BUY_DLG = {
     { who:'marisol', line:"That's the trick scientists use for anything they can't see, like fear, or hunger, or memory. They find something they can actually count that stands in for it. They call it operationalizing, and every honest study starts there." },
   ],
   instrTier: [
-    { who:'marisol', line:"Good. Now, a better glass will never tell you for sure that a storm is coming. Nothing can. But it makes the reading clearer, so you will guess wrong less often." },
-    { who:'marisol', line:"Scientists call that sensitivity. Give someone a sharper tool, or train them well, and they get better at telling a real signal from random noise. It's the same skill a radar operator or a doctor reading an x-ray spends years building." },
+    { who:'marisol', line:"A proper barometer. Now you get a dial that shows which way the pressure is leaning, toward a storm or toward calm. It won't tell you for sure, nothing can, but it beats guessing from the look of the sky." },
+    { who:'marisol', line:"That's what a good instrument buys you: sensitivity. A sharper tool makes it easier to tell a real signal from random noise. It's the same skill a radar operator or a doctor reading an x-ray spends years training." },
   ],
   hulls: [
     { who:'marisol', line:"An extra boat. Now if you guess wrong and one gets caught out in a storm, it isn't the end of you. You can afford a mistake or two." },
@@ -671,6 +672,7 @@ function startTutorial(){ state='tutorial'; tutIx=0; tutStorm=false; _shopReturn
 function renderTutorial(){
   const b=TUT[tutIx]; if(!b){ save.tutDone=true; saveProgress(); levelIdx=0; startLevel(); return; }
   tutStorm=!!b.storm;
+  if(b.act==='salary' && save.money<20){ save.money=20; saveProgress(); }   // the money appears in the counter as she hands it over
   overlayWrap.hidden=false; overlayWrap.classList.add('titlescreen'); overlay.style.cssText=''; updateCoins();
   const fig=(w,cls)=> '<img class="vn-fig '+cls+'" src="assets/portrait_'+w+'.webp" alt="'+(TUT_NAMES[w]||w)+'" onerror="this.style.display=\'none\'">';
   const link = b.link? '<a class="vn-link" href="'+LEVELS[0].story.url+'" target="_blank" rel="noopener">Read the real story of Pavlov and his dogs ↗</a>':'';
@@ -696,7 +698,6 @@ function renderTutorial(){
 }
 function tutAct(b){
   audioOn();
-  if(b.act==='salary'){ save.money=20; saveProgress(); }
   if(b.act==='shop'){ _shopReturn='tutorial'; state='shop'; renderShop(); return; }
   if(b.act==='begin'){ save.tutDone=true; save.pollTier=Math.max(1,save.pollTier); saveProgress(); levelIdx=0; startLevel(); return; }
   tutIx++; renderTutorial();
@@ -742,8 +743,8 @@ function newGame(idx){
         probeHistory:[], lastProbe:null, probeScene:null, isExtraProbe:false,
         // ONBOARDING (Season 1 only): reveal the belief meter and the CS/US/CR labels one at a time, as each first matters.
         onboard:(L.id===1 && !save.uiTaught), coach:null,
-        reveal:(L.id===1? {cs:false,us:false,cr:false,gauge:false,boats:false,catch:false,squalls:false,meter:false}
-                        : {cs:true,us:true,cr:true,gauge:true,boats:true,catch:true,squalls:true,meter:true}),
+        reveal:(L.id===1? {cs:false,us:false,cr:false,intro:false,boats:false,catch:false,squalls:false,meter:false}
+                        : {cs:true,us:true,cr:true,intro:true,boats:true,catch:true,squalls:true,meter:true}),
         pools:{ calm:SKYPOOL.calm.slice(), mid:SKYPOOL.mid.slice(), heavy:SKYPOOL.heavy.slice(),
                 bLo:BARKS.lo.slice(), bMd:BARKS.md.slice(), bHi:BARKS.hi.slice(), bMiss:BARKS.miss.slice() } };
   if(L.decoyNights){
@@ -762,7 +763,7 @@ function rollNight(){
   G.coach=null;   // onboarding notes live for one night only
   if(G.onboard){   // Season 1: introduce one piece of the screen per night, each with a plain callout
     const r=G.reveal;
-    if(G.night===1 && !r.gauge){ r.gauge=true; G.coach='See the dial just below? That is your barometer. It leans toward STORM when a storm is likely tonight, and toward CALM when it is not. Read it, then light the lamp to warn the crews, or leave it dark and let them fish.'; }
+    if(G.night===1 && !r.intro){ r.intro=true; G.coach='Each night, read the weather in the line just below, then decide. Light the lamp to warn the crews and keep them safe in port, or leave it dark and let them sail out to fish. You cannot do both, so choose well. (Later you can buy a barometer for a clearer read.)'; }
     else if(G.night===2 && !r.boats){ r.boats=true; r.squalls=true; G.coach='New up top: your boats, and how many big storms the almanac expects this season. If you lose every boat, the season is over, so warning the crews at the right time keeps them safe.'; }
     else if(G.night===3 && !r.catch){ r.catch=true; G.coach='New up top: your catch. The town needs enough fish to make it through winter. Every night the crews stay in port, they land nothing, so you cannot warn them for no reason.'; }
     else if(G.night===4 && !r.meter){ r.meter=true; G.coach='Last piece: the trust bar you bought the newspaper for. It shows how much the crews believe your lamp. Above the line, they heed it. Warn them true and watch it climb.'; if(!TESTMODE){ save.uiTaught=true; saveProgress(); } }
@@ -1326,7 +1327,8 @@ function renderDecision(){
       announce(G.finale?'The night of the Deep. Ring the bell, or wave the fleet out?': askDecoy?'And Sefu’s lantern. Would the crew turn for that too?':'A muster. Would the crew heed a lit lamp tonight?');
     } else {
       musterRow.hidden=true; choiceRow.hidden=false; $('btnLight').disabled=false; $('btnDark').disabled=false;
-      $('sky').hidden=false; $('skyNeedle').style.left=Math.round(G.sky*100)+'%';
+      const hasGlass = save.instrTier>=1;   // the barometer dial is a shop item; without it you read the weather in words
+      $('sky').hidden = !hasGlass; if(hasGlass) $('skyNeedle').style.left=Math.round(G.sky*100)+'%';
       if(G.isDecoy){
         $('btnLight').innerHTML='Light your lamp too<span class="sub">both lights burn</span>';
         $('btnDark').innerHTML='Keep the tower dark<span class="sub">let Sefu’s light stand alone</span>';
@@ -1336,7 +1338,7 @@ function renderDecision(){
       }
       cl.innerHTML = 'Night '+G.night+'. '+G.skyLine+' <b>'+skyOdds(G.sky)+'</b>.'
         + (G.isDecoy ? ' <span style="color:#e0b978">Down on the dock, Sefu’s lantern is lit.</span>' : '')
-        + (G.night===1 ? ' <span style="color:#9fd8b0">The bar above is tonight’s reading: the further toward STORM, the likelier a storm. Light the lamp to call the crew in, or leave it dark and let them fish.</span>' : '')
+        + (hasGlass && G.night===1 ? ' <span style="color:#9fd8b0">The dial above is your barometer: the further toward STORM, the likelier a storm.</span>' : '')
         + (G.isMuster && G.musterAnswered && !G.isDecoy ? '<div class="bark"><img src="assets/portrait_marisol.webp" alt="" onerror="this.style.display=\'none\'"><span>'+gossipLine()+'</span></div>' : '')
         + (G.inQuiet ? ' <span style="color:var(--warn)">The calm holds.</span>' : '');
       announce('Night '+G.night+'. '+G.skyLine+' '+skyOdds(G.sky)+(G.isDecoy?'. Sefu’s lantern is lit. Light your lamp too, or keep the tower dark?':'. Light the lamp, or leave it dark?'));
@@ -1494,7 +1496,7 @@ function renderOverlay(){
         : 'Light the lamp <b>(L)</b> or leave it dark <b>(D)</b>. At a muster, they will heed <b>(R)</b> or they will not <b>(W)</b>. <b>Space</b> moves on.'}</p>
       <div style="margin-top:4px">
         <button class="btn" id="bStart" type="button">${L.id===1?'Light the first night':'Begin the season'}</button>
-        <button class="btn" id="bShop" type="button" style="background:linear-gradient(180deg,#caa24a,#9a7b2e);margin-left:8px">The shop</button>
+        ${save.tutDone?'<button class="btn" id="bShop" type="button" style="background:linear-gradient(180deg,#caa24a,#9a7b2e);margin-left:8px">The shop</button>':''}
         ${levelIdx>0?'<button class="btn" id="bPrev" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">◀ Earlier season</button>':''}
         ${levelIdx<LEVELS.length-1?'<button class="btn" id="bFwd" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">Later season ▶</button>':''}
       </div>
