@@ -569,6 +569,31 @@ function rollNight(){
     else if(G.night>=L.nights-2) playSnd('foghorn',0.25);
   }
 }
+/* ============================ THE PROBE (CS-alone test) ============================ */
+// Read-only measurement: run the lamp up COLD over a flat sea and count how many of the crew still
+// break for the harbor at the SIGNAL ALONE. That count is the conditioned response to the bell with no
+// food behind it. It draws ONLY from auxRng and writes ONLY probe fields, so the fairness battery is
+// untouched. It grows across acquisition and shrinks across extinction.
+function runProbe(assoc, thresh){
+  const rfx = probeReflex(assoc, thresh);
+  const scramble = binomAux(CONFIG.crewN, rfx);   // out of the seven CREW (people), not boats -- boat attrition must not mask the reflex
+  const prev = G.lastProbe;
+  const p = { night:G.night, rfx:+rfx.toFixed(3), scramble, delta: prev? scramble-prev.scramble : null };
+  G.probeHistory.push(p); G.lastProbe = p;
+  G.probeScene = { scramble, until: animTime + 2.6 };
+  return p;
+}
+function probePhrase(rfx){ return rfx<0.12?'A glance up, and back to the nets.'
+  : rfx<0.38?'A couple of them twitch toward shore, then think better of it.'
+  : rfx<0.65?'About half drop their nets and start for the harbor.'
+  : 'They break for the harbor as one, the way they used to run from a black sky.'; }
+function startProbeBeat(){
+  if(TESTMODE){ G.probePhase=0; renderDecision(); return; }   // bots skip the pause; the probe is already recorded
+  G.probePhase=1; playSnd('page_turn',0.3); renderDecision();
+  const tok=++beatTok;
+  setTimeout(()=>{ if(tok===beatTok && state==='reading' && G.probePhase===1) endProbeBeat(); }, 3000);
+}
+function endProbeBeat(){ if(!G||G.probePhase!==1) return; G.probePhase=0; G.probeScene=null; renderDecision(); }
 /* ============================ THE MUSTER ============================ */
 function muster(call){
   if(state!=='reading' || !G.isMuster || G.musterAnswered) return;
@@ -583,7 +608,9 @@ function muster(call){
     if(!playSnd('bell',0.5)) snd.foghorn();
     G.musterCall={lamp:call, decoy:null};
     if(G.isDecoy){ G.musterPhase=1; renderDecision(); return; }   // a second question follows
-    G.musterAnswered=true; renderDecision(); return;
+    G.musterAnswered=true;
+    runProbe(G.trust, G.lev.heedThreshold);   // CS-alone probe: measure the reflex to the lamp, then the beat plays
+    startProbeBeat(); return;
   }
   if(G.musterPhase===1){ playSnd('bell',0.35);
     G.musterCall.decoy=call; G.musterPhase=2; G.musterAnswered=true; renderDecision(); return;
@@ -990,6 +1017,27 @@ function renderDecision(){
         + (G.night===1? ' <span style="color:#9fd8b0">This season the crew act first. Spend a ration on the nights they actually drill, and the drill grows into a habit.</span>':'');
       announce('Night '+G.night+'. '+(G.drilled?'The crew drilled. Reward it, or hold the ration?':'The crew kept to the deck. Reward, or hold the ration?')); return;
     }
+    // THE PROBE BEAT: a cold test of the lamp, shown alone before tonight's decision
+    if(G.probePhase===1 && G.lastProbe){
+      musterRow.hidden=true; choiceRow.hidden=true; $('sky').hidden=true;
+      const lp=G.lastProbe;
+      const deltaTxt = lp.delta==null ? 'This is your first cold test of the season.'
+        : lp.delta>0 ? '<b>Up '+lp.delta+'</b> from your last cold test.'
+        : lp.delta<0 ? '<b>Down '+(-lp.delta)+'</b> from your last cold test.'
+        : 'The same as your last cold test.';
+      let insightLine='';
+      if(lp.rfx>=0.5 && !G.insights.probeCross && !L.decay){ G.insights.probeCross=1;
+        insightLine='<div style="margin-top:9px;background:#fff7e2;color:#4a3d2a;border:2px solid var(--lampDk);border-left-width:6px;border-radius:8px;padding:8px 11px;text-align:left;font-family:Spectral,serif;font-size:13.5px;line-height:1.5">They ran for the harbor at the lamp alone, no storm in the sky. The lamp now sets off the very scramble the storm used to. That reflex to the signal by itself is the response you have been building all season.</div>'; }
+      cl.innerHTML='<div style="text-align:center">'
+        + '<div style="font-size:10.5px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#f5c14e">A cold test &middot; the lamp alone</div>'
+        + '<div style="font-size:20px;margin:5px 0"><b>'+lp.scramble+' of the seven</b> broke for the harbor.</div>'
+        + '<div style="font-family:Spectral,serif;color:#dbe6f5">The sea is flat, no storm behind the light. '+probePhrase(lp.rfx)+'</div>'
+        + '<div class="small" style="margin-top:6px;color:#cfe0f2">'+deltaTxt+'</div>'
+        + insightLine
+        + '<div class="small" style="margin-top:9px;color:#9fb4cc">press Space, or tap, to go on &#9656;</div></div>';
+      announce(lp.scramble+' of seven broke for the lamp alone.');
+      return;
+    }
     if(G.isMuster && !G.musterAnswered){
       musterRow.hidden=false; choiceRow.hidden=true; $('sky').hidden=true;
       const askDecoy = (G.isDecoy && !G.finale && G.musterPhase===1);
@@ -1303,6 +1351,29 @@ function drawAmbient(){
   ctx.save(); ctx.shadowColor='#f5c14e'; ctx.shadowBlur=28; ctx.fillStyle='#f5c14e'; ctx.beginPath(); ctx.arc(lampX,lampY,9,0,7); ctx.fill(); ctx.restore();
   for(let i=0;i<3;i++){ const bob=motionOK? Math.sin(animTime*1.6+i)*3:0; drawBoat(W*0.09+i*42, H*0.83+bob, 22); }
 }
+// THE PROBE SCENE: the lamp lit cold over a flat sea; `scramble` of the seven break for the harbor at
+// the signal alone (the conditioned response), the rest stay at their nets. No storm, no rain, no shake.
+function drawProbeScene(){
+  const calmBg = IMG.bg_starlit||IMG.bg_dusk;
+  if(calmBg) drawCover(calmBg);
+  else { const g=ctx.createLinearGradient(0,0,0,H*0.7); g.addColorStop(0,'#0c1330'); g.addColorStop(1,'#1a2746'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    const sg=ctx.createLinearGradient(0,H*0.7,0,H); sg.addColorStop(0,'#26395a'); sg.addColorStop(1,'#16202f'); ctx.fillStyle=sg; ctx.fillRect(0,H*0.7,W,H*0.3); }
+  const lampX = calmBg? W*0.42 : W*0.80, lampY = calmBg? H*0.27 : H*0.42;
+  const pulse = motionOK? 0.55+0.45*Math.sin(animTime*2.2):1;
+  ctx.save(); ctx.globalAlpha=0.16*pulse; ctx.fillStyle='#ffe39a'; ctx.beginPath(); ctx.arc(lampX,lampY,54,0,7); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.shadowColor='#f5c14e'; ctx.shadowBlur=32; ctx.fillStyle='#f5c14e'; ctx.beginPath(); ctx.arc(lampX,lampY,11,0,7); ctx.fill(); ctx.restore();
+  const sc = G.probeScene.scramble|0, N=CONFIG.crewN;
+  const t = motionOK? Math.max(0,Math.min(1,(animTime-(G.probeScene.until-2.6))/1.1)) : 1;   // scramble runs in over ~1.1s
+  const y=H*0.84;
+  for(let i=0;i<N;i++){
+    const runner = i<sc;
+    let x;
+    if(runner){ const sx=W*0.52+i*13, ex=W*0.14+i*15; x=sx+(ex-sx)*t; }   // break for the harbor (toward the light)
+    else { x=W*0.62+(i-sc)*20; }                                          // stay at the nets
+    drawCrewFigure(i, x, y, 34);
+  }
+  for(let i=0;i<3;i++){ drawBoat(W*0.07+i*28, H*0.91, 19); }              // boats moored at the calm dock
+}
 function drawScene(){
   if(state==='title'){ if(bgVideoLive()){ ctx.clearRect(0,0,W,H); } else drawAmbient(); return; }
   if(state==='menu'){ ctx.clearRect(0,0,W,H); if(IMG.coast_map){ drawCover(IMG.coast_map); ctx.fillStyle='rgba(10,16,28,.25)'; ctx.fillRect(0,0,W,H); } else drawAmbient(); return; }
@@ -1312,6 +1383,7 @@ function drawScene(){
     else drawAmbient();
     return; }
   ctx.clearRect(0,0,W,H);
+  if(G && G.probePhase===1 && G.probeScene){ drawProbeScene(); return; }
   const storm = (state==='resolved' && G && G.outcome && G.outcome.storm && G.beat===2);
   const finaleVideo = G && G.finale && bgVideoLive();
   const calmBg = IMG.bg_starlit||IMG.bg_dusk;
@@ -1420,9 +1492,11 @@ $('btnRing').onclick=()=>muster(true);
 $('btnWave').onclick=()=>muster(false);
 $('next').onclick=nextNight;
 $('bMenu').onclick=()=>{ audioOn(); autoTok++; beatTok++; state='menu'; renderOverlay(); };
+$('stagewrap').addEventListener('pointerdown',()=>{ if(state==='reading' && G && G.probePhase===1) endProbeBeat(); });
 $('vol').addEventListener('input',e=>{ audioOn(); setVol((+e.target.value||0)/100); });
 addEventListener('keydown',e=>{ const k=e.key.toLowerCase();
   if(state==='reading'){
+    if(G.probePhase===1){ if(k===' '||k==='enter'||k==='arrowright'){ e.preventDefault(); endProbeBeat(); } return; }
     if(G.isMuster && !G.musterAnswered){
       if(k==='r'){ e.preventDefault(); muster(true); } else if(k==='w'){ e.preventDefault(); muster(false); }
     } else {
@@ -1446,6 +1520,7 @@ window.keeper={
       stormsDealt:G.lev.deckStorms, stormsSpent:G.stormsSpent, nightLog:G.nightLog.slice(),
       readiness:+(G.readiness||0).toFixed(1), ritualStrength:+(G.ritual||0).toFixed(1), drilled:G.drilled,
       drillTendency:G.drillTendency, rations:G.rations, operant:isOperant(G.lev),
+      probeHistory:G.probeHistory.slice(), lastProbe:G.lastProbe, probePhase:G.probePhase,
       reason:G.endReason||null, stats:Object.assign({},G.stats) }:null; },
   start(idx){ newGame(idx==null?levelIdx:idx); state='reading'; overlayWrap.hidden=true; renderDecision(); },
   muster, decide, next:nextNight,
