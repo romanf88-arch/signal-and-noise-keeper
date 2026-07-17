@@ -1464,6 +1464,25 @@ function armReset(a){ if(!a) return;
   if(a.dataset.armed==='1'){ resetProgress(); return; }
   a.dataset.armed='1'; const t=a.textContent; a.textContent='Click again to erase all progress';
   setTimeout(()=>{ if(a && a.isConnected){ a.dataset.armed='0'; a.textContent=t; } }, 4000); }
+// mid-season pause menu: the one place to resume, leave to the harbor, or start over. Reached by the Harbor button or Escape.
+let _prePause=null;
+function pauseGame(){
+  if(!(state==='reading'||state==='resolved')) return;   // only during a live season night
+  _prePause=state; state='paused'; autoTok++; beatTok++;   // cancel any auto-advancing beat
+  overlayWrap.hidden=false; overlayWrap.classList.remove('titlescreen'); overlay.style.cssText='';
+  overlay.innerHTML = `<div style="text-align:center">
+    <div style="font-family:'Cinzel',serif;font-weight:700;font-size:22px;letter-spacing:1px;color:#9a7b2e;margin-bottom:6px">Paused</div>
+    <p class="prose" style="margin:0 0 14px">Pick the season back up where you left off, sail back to the harbor to switch seasons or visit the shop, or wipe everything and start from the very beginning. Leaving or starting over ends the season you are in now.</p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button class="btn" id="pResume" type="button">Keep playing</button>
+      <button class="btn" id="pHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">⚓ Back to the harbor</button>
+      <button class="btn" id="pReset" type="button" style="background:linear-gradient(180deg,#b0725a,#8a4f3a)">Start over from the beginning</button>
+    </div></div>`;
+  $('pResume').onclick=resumeGame;
+  $('pHarbor').onclick=()=>{ state='menu'; renderOverlay(); };
+  $('pReset').onclick=()=>armReset($('pReset'));
+}
+function resumeGame(){ if(state!=='paused') return; state=_prePause||'reading'; overlayWrap.hidden=true; renderDecision(); canvas.focus({preventScroll:true}); }
 function renderOverlay(){
   if(!(state==='won'||state==='lost')) _slides=null;   // leave slideshow mode
   $('wrap').classList.remove('playing');
@@ -1805,10 +1824,12 @@ $('btnDark').onclick=()=>decide(false);
 $('btnRing').onclick=()=>muster(true);
 $('btnWave').onclick=()=>muster(false);
 $('next').onclick=nextNight;
-$('bMenu').onclick=()=>{ audioOn(); autoTok++; beatTok++; state='menu'; renderOverlay(); };
+$('bMenu').onclick=()=>{ audioOn(); pauseGame(); };
 $('stagewrap').addEventListener('pointerdown',()=>{ if(state==='reading' && G && G.probePhase===1) endProbeBeat(); });
 $('vol').addEventListener('input',e=>{ audioOn(); setVol((+e.target.value||0)/100); });
 addEventListener('keydown',e=>{ const k=e.key.toLowerCase();
+  if(k==='escape'){ if(state==='reading'||state==='resolved'){ e.preventDefault(); pauseGame(); return; } if(state==='paused'){ e.preventDefault(); resumeGame(); return; } }
+  if(state==='paused'){ if(k===' '||k==='enter'){ e.preventDefault(); resumeGame(); } return; }
   if(state==='reading'){
     if(G.probePhase===1){ if(k===' '||k==='enter'||k==='arrowright'){ e.preventDefault(); endProbeBeat(); } return; }
     if(G.isMuster && !G.musterAnswered){
