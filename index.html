@@ -67,7 +67,8 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   #fieldnote.s3{ background:rgba(46,34,16,.72); border-left-color:#e0b978; }
   #fieldnote.s3 .pill{ background:#e0b978; } #fieldnote.s3 .lens{ color:#c9a86f; } #fieldnote.s3 .txt b{ color:#f0d59a; }
   /* HUD */
-  #hud{ display:grid; grid-template-columns:1fr 1fr 1.4fr 1fr; gap:8px; margin-top:9px; }
+  #hud{ display:flex; gap:8px; margin-top:9px; justify-content:center; flex-wrap:wrap; }
+  #hud .stat{ flex:1 1 96px; min-width:96px; } #hud #tCatch{ flex:1.4 1 130px; }
   .stat{ background:rgba(16,24,40,.55); border:2px solid var(--edge); border-radius:11px; padding:8px 10px; text-align:center; }
   .stat .lab{ font-size:10.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
   .stat .val{ font-size:19px; font-weight:900; color:#fff; line-height:1.2; }
@@ -202,6 +203,25 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   .si-owned{ font-weight:800; color:#3c7a5d; font-size:13px; }
   .si-locked{ font-weight:800; color:#9a6a4a; font-size:12.5px; }
   @media (max-width:560px){ .shopgrid{ grid-template-columns:1fr; } }
+  /* the tutorial (visual-novel): characters on the sides, a dark high-contrast dialogue box at the bottom */
+  .vnwrap{ position:absolute; inset:0; }
+  .vn-portraits{ position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+  .vn-fig{ position:absolute; bottom:27%; width:min(34%,220px); border-radius:14px; border:3px solid var(--lamp);
+    box-shadow:0 10px 30px rgba(0,0,0,.6); background:#16202f; }
+  .vn-fig.left{ left:3.5%; } .vn-fig.right{ right:3.5%; }
+  .vn-fig.dim{ filter:grayscale(.55) brightness(.5); border-color:#5a6678; box-shadow:0 6px 18px rgba(0,0,0,.5); }
+  .vn-box{ position:absolute; left:50%; transform:translateX(-50%); bottom:5%; width:min(640px,92%);
+    background:rgba(9,14,24,.95); border:2px solid var(--lamp); border-radius:15px; padding:16px 24px 16px;
+    box-shadow:0 12px 38px rgba(0,0,0,.6); }
+  .vn-name{ font-family:'Cinzel',serif; font-weight:700; font-size:15px; color:#f5c14e; margin-bottom:6px; letter-spacing:.3px; }
+  .vn-text{ font-family:'Spectral',serif; font-size:18px; line-height:1.55; color:#f4f7fc; }
+  .vn-link{ display:inline-block; margin-top:9px; color:#f5d98a; font-weight:800; font-size:13px; text-decoration:underline; }
+  .vn-cont{ text-align:right; margin-top:11px; }
+  .vn-btn{ margin-top:0; font-size:16px; padding:10px 24px; background:linear-gradient(180deg,#4a8b9a,#2c5b66); color:#fff; }
+  .vn-btn.amber{ background:linear-gradient(180deg,#f5c14e,#d8a13a); color:#3a2a08; }
+  .vn-btn.gold{ background:linear-gradient(180deg,#caa24a,#9a7b2e); color:#fff; }
+  .vn-step{ position:absolute; top:12px; right:16px; font-size:11px; color:#cfe0f2; opacity:.65; }
+  @media (max-width:560px){ .vn-fig{ width:30%; bottom:38%; } .vn-box{ bottom:3%; padding:13px 16px; } .vn-text{ font-size:16px; } }
   :focus-visible{ outline:3px solid var(--lamp); outline-offset:2px; }
   .vh{ position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%); }
   @media (max-width:560px){
@@ -224,7 +244,7 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   <div id="topbar">
     <div class="title">Signal &amp; Noise</div>
     <div class="tbtns">
-      <span id="coins" class="tbtn" hidden style="cursor:default;background:#fff7e2" title="Your wages" aria-label="Your money">🪙&nbsp;<b id="coinVal">0</b></span>
+      <span id="coins" class="tbtn" hidden style="cursor:default;background:#fff7e2" title="Your money" aria-label="Your money">$<b id="coinVal">0</b></span>
       <button id="bMenu" class="tbtn" type="button" hidden aria-label="Leave the season and return to the harbor">⚓ Harbor</button>
       <span class="vol" title="Music volume">🎵<input id="vol" type="range" min="0" max="100" value="60" aria-label="Music volume"></span>
     </div>
@@ -236,10 +256,10 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   </div>
 
   <div id="hud">
-    <div class="stat"><div class="lab">Night</div><div class="val" id="sNight">1 / 14</div></div>
-    <div class="stat"><div class="lab">Boats</div><div class="val boats" id="sBoats">⛵⛵⛵⛵⛵⛵⛵</div></div>
-    <div class="stat"><div class="lab">Catch</div><div class="cbar" id="cBar"><div class="cfill" id="cFill"></div><div class="notch" id="cNotch"></div></div><div class="lab" id="cLab" style="margin-top:4px;text-transform:none"></div></div>
-    <div class="stat"><div class="lab">Squalls</div><div class="val" id="sSquall">0 / 5</div></div>
+    <div class="stat" id="tNight"><div class="lab">Night</div><div class="val" id="sNight">1 / 14</div></div>
+    <div class="stat" id="tBoats"><div class="lab">Boats</div><div class="val boats" id="sBoats">⛵⛵⛵⛵⛵⛵⛵</div></div>
+    <div class="stat" id="tCatch"><div class="lab">Catch</div><div class="cbar" id="cBar"><div class="cfill" id="cFill"></div><div class="notch" id="cNotch"></div></div><div class="lab" id="cLab" style="margin-top:4px;text-transform:none"></div></div>
+    <div class="stat" id="tSquall"><div class="lab">Squalls</div><div class="val" id="sSquall">0 / 5</div></div>
   </div>
   <div id="deepchip" hidden></div>
 
@@ -507,7 +527,7 @@ function isOperant(L){ return L && L.startReadiness!=null; }
 function drillEmit(R,S,L){ const g=L.emitGamma, k=L.emitK; const rp=Math.pow(Math.max(0,R),g), sp=Math.pow(Math.max(0,S),g), kp=Math.pow(k,g); return rp/(rp+sp+kp); }
 let levelIdx=0, maxUnlocked=0;
 // persistent save: the harbor economy + progress, as one versioned JSON blob. Migrates the old bare keeperMax once.
-function defaultSave(){ return { v:1, money:0, hulls:5, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, maxUnlocked:0, tutDone:false }; }
+function defaultSave(){ return { v:1, money:0, hulls:5, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, maxUnlocked:0, tutDone:false, uiTaught:false }; }
 let save = defaultSave();
 try{
   const raw = localStorage.getItem('keeperSave');
@@ -546,9 +566,9 @@ function shopItems(){ return [
     effect:'Your read of the sky: '+['plain and noisy','sharper','sharper still','the clearest a keeper can buy'][save.instrTier],
     teach:'A better instrument tells the storm’s signal from the noise in the sky. Psychologists call that sensitivity, and a sharper tool raises it, though it never makes you certain.' },
   { key:'hulls', name:'Another Boat', sub: save.hulls+' in your fleet',
-    cost: save.hulls<8? (20 + 8*Math.max(0,save.hulls-5)) : null, gated:false,
-    effect: save.hulls+' boats. Lose them all in a season and it ends.',
-    teach:'More boats, and a missed storm costs you less. How much a miss costs is exactly what should set how cautious you are about crying wolf.' },
+    cost: save.hulls<8? (25 + 10*Math.max(0,save.hulls-5)) : null, gated:false,
+    effect: save.hulls+' boats. If you lose them all in one season, the season is over.',
+    teach:'With more boats, losing one to a storm hurts less. And how much a mistake costs you is exactly what should decide how careful you are about warning.' },
   { key:'storageTier', name:'The Ice Cellar', sub:'holds '+[10,20,35,55,80][save.storageTier]+' fish',
     cost:[25,45,70,100][save.storageTier]!=null?[25,45,70,100][save.storageTier]:null, gated:false,
     effect:'Keep up to '+[10,20,35,55,80][save.storageTier]+' surplus fish per season; the rest spoil.',
@@ -577,10 +597,10 @@ function renderShop(){
     <div class="si-foot">${
       it.cost==null ? '<span class="si-owned">Fully upgraded</span>'
       : it.gated ? '<span class="si-locked">🔒 clear more seasons to unlock</span>'
-      : '<button class="btn si-btn" type="button" data-buy="'+it.key+'"'+(save.money<it.cost?' disabled':'')+'>Buy &nbsp;·&nbsp; 🪙 '+it.cost+'</button>'
+      : '<button class="btn si-btn" type="button" data-buy="'+it.key+'"'+(save.money<it.cost?' disabled':'')+'>Buy &nbsp;·&nbsp; $'+it.cost+'</button>'
     }</div></div>`).join('');
   overlay.innerHTML = `<div style="text-align:center;margin:-2px 0 8px"><div style="font-family:'Cinzel',serif;font-weight:700;font-size:24px;letter-spacing:1px;color:#9a7b2e">The Chandlery</div>
-      <div class="small" style="font-weight:800;color:#2c5b66">You hold 🪙 <b id="shopCoins">${save.money}</b> coins</div></div>
+      <div class="small" style="font-weight:800;color:#2c5b66">You have $<b id="shopCoins">${save.money}</b></div></div>
     <p class="prose" style="font-size:14.5px">Everything here sharpens how you read the sky, protects your fleet, or raises your wage. None of it buys the crew’s belief in your lamp, which you earn one honest night at a time.</p>
     <div class="shopgrid">${cards}</div>
     <div style="margin-top:12px"><button class="btn" id="bShopBack" type="button">⚓ Back to the harbor</button></div>`;
@@ -594,29 +614,20 @@ function renderShop(){
 // psychology explains it, then the salary -> shop -> Gazette chain introduces money and reveals the belief meter.
 // Draws no RNG and no deck card; the counted season starts fresh after it. Skipped in TESTMODE and once tutDone.
 let tutIx=0, tutStorm=false, _shopReturn=null;
+const TUT_NAMES = { previous:'The old keeper', marisol:'Marisol, the harbormaster', odell:'Captain Odell' };
 const TUT=[
-  { who:'previous', name:'The old keeper',
-    line:'I lit the lamp for every little squall, until no one looked up when it burned. The tower is yours now, and what little trust the crews have left comes with it.' },
-  { who:'marisol', name:'Marisol, the harbormaster',
-    line:'You keep the light now. When a storm is coming, you light the lamp, and the crews stay off the water where it is safe.' },
-  { who:'marisol', name:'Marisol',
-    line:'But a crew that stays in every night lands no fish, and a town with no fish does not last the winter. Some nights you have to let them sail.' },
-  { who:'marisol', name:'Marisol', act:'light',
-    line:'A bad storm is coming tonight, for certain. Light the lamp and call the crews in.' },
-  { who:'odell', name:'Captain Odell', storm:true,
-    line:'The last keeper burned that lamp every night. We fish. ... The storm rolls in over the open water, and one of your boats does not come home.' },
-  { who:'marisol', name:'Marisol',
-    line:'You did nothing wrong. They simply do not believe the lamp yet. The keeper before you lit it on calm nights until it stopped meaning anything at all.' },
-  { who:'marisol', name:'Marisol',
-    line:'Years ago a man named Pavlov rang a bell just before he fed his dogs. After enough meals, the bell by itself made them drool, with no food in sight.' },
-  { who:'marisol', name:'Marisol', link:true,
-    line:'Your lamp is that bell, and the storm is the food. Warn the crews true, night after night, and in time the lamp alone will hold them ashore.' },
-  { who:'marisol', name:'Marisol', act:'salary',
-    line:'You win that belief back one honest night at a time. Here is an advance on your wage to begin with.' },
-  { who:'marisol', name:'Marisol', act:'shop',
-    line:'Take it to the chandlery. Buy the Gazette, so you can read where the crews’ belief stands, and spend the rest as you see fit before the season.' },
-  { who:'marisol', name:'Marisol', act:'begin',
-    line:'Good. That bar is the crews’ belief in your lamp. Above the line they heed it and stay in; below it, they sail. Read it, warn them true, and feed the town.' },
+  { who:'previous', line:"Well, the light is yours now. I will be honest with you. I made a mess of it. For years I lit the lamp for every little cloud, until the fishermen stopped believing it meant anything at all. Good luck winning them back." },
+  { who:'marisol', line:"I am Marisol, the harbormaster. Your job is simple to say. When a storm is coming, you light the lamp, and the fishermen stay in port where it is safe." },
+  { who:'marisol', line:"But here is the hard part. If they never go out, they catch no fish, and their families go hungry. So you cannot just warn them every night. You have to pick your moments." },
+  { who:'marisol', act:'light', line:"Let us try one. There is a bad storm rolling in tonight, no question about it. Light the lamp and call them in." },
+  { who:'odell', with:'marisol', storm:true, line:"Ha. Nice try, keeper. The last one lit that lamp every single night. We are going fishing." },
+  { who:'marisol', line:"See that? You did the right thing, and they sailed out anyway and lost a boat for it. That is not your fault. They just do not trust the lamp yet." },
+  { who:'marisol', line:"Let me tell you why it works this way. Have you heard of Pavlov? He was a scientist who rang a bell right before he fed his dogs, every single time." },
+  { who:'marisol', link:true, line:"After a while, the dogs started drooling the moment they heard the bell, before any food showed up. The bell had come to mean food is coming." },
+  { who:'marisol', line:"Your lamp is the same. Right now it means nothing to them. But if you only light it when a storm is really coming, over and over, they will learn that the lamp means danger. Then they come in every time you light it." },
+  { who:'marisol', act:'salary', line:"That takes time, and time takes money. Here is your first paycheck. It is not much, twenty dollars, but it is a start." },
+  { who:'marisol', act:'shop', line:"Take it to the shop next door. Most of it you cannot afford yet. But you can buy the newspaper, which polls the fishermen so you can see how much they trust you. Get that one." },
+  { who:'marisol', act:'begin', line:"There it is. That bar is their trust in your lamp. Get it above the line and they will listen. Now go read the sky, warn them true, and keep this town fed." },
 ];
 function startTutorial(){ state='tutorial'; tutIx=0; tutStorm=false; _shopReturn=null;
   save.money=0; save.pollTier=0; G=null; overlayWrap.hidden=false; showBgVideo(false); renderTutorial(); }
@@ -624,26 +635,31 @@ function renderTutorial(){
   const b=TUT[tutIx]; if(!b){ save.tutDone=true; saveProgress(); levelIdx=0; startLevel(); return; }
   tutStorm=!!b.storm;
   overlayWrap.hidden=false; overlayWrap.classList.add('titlescreen'); overlay.style.cssText=''; updateCoins();
-  const linkHTML = b.link? '<div style="margin-top:8px"><a href="'+LEVELS[0].story.url+'" target="_blank" rel="noopener" style="color:#f5d98a;font-weight:800;font-size:13px">Read the whole story of Pavlov’s dogs ↗</a></div>':'';
-  let label = 'Continue ▸';
+  const fig=(w,cls)=> '<img class="vn-fig '+cls+'" src="assets/portrait_'+w+'.webp" alt="'+(TUT_NAMES[w]||w)+'" onerror="this.style.display=\'none\'">';
+  const link = b.link? '<a class="vn-link" href="'+LEVELS[0].story.url+'" target="_blank" rel="noopener">Read the real story of Pavlov and his dogs ↗</a>':'';
+  let label='Continue ▸';
   if(b.act==='light') label='Light the lamp';
-  else if(b.act==='shop') label='Open the chandlery';
-  else if(b.act==='begin') label='Begin the season';
-  const btnBg = (b.act==='light')?'background:linear-gradient(180deg,#f5c14e,#d8a13a);color:#3a2a08'
-    : (b.act==='shop')?'background:linear-gradient(180deg,#caa24a,#9a7b2e)':'';
-  overlay.innerHTML = `<div class="titlecard" style="max-width:480px">
-    <img src="assets/portrait_${b.who}.webp" alt="${b.name}" style="width:98px;height:98px;border-radius:50%;object-fit:cover;border:3px solid var(--lampDk);box-shadow:0 3px 16px rgba(0,0,0,.55)" onerror="this.style.display='none'">
-    <div class="small" style="margin-top:7px;font-weight:800;letter-spacing:.4px;color:#e9eefb;text-shadow:0 1px 6px rgba(0,0,0,.8)">${b.name}</div>
-    <p class="hook" style="font-size:17px;font-style:normal;color:#f2f5fc;max-width:440px;margin:12px auto 0">${b.line}</p>
-    ${linkHTML}
-    <div style="margin-top:18px"><button class="bigbtn" id="tutBtn" type="button" style="${btnBg}">${label}</button></div>
-    <div class="small" style="margin-top:12px;color:#aeb6c8">${tutIx+1} of ${TUT.length}</div>
+  else if(b.act==='shop') label='Go to the shop';
+  else if(b.act==='begin') label='Start the season';
+  const btnCls = (b.act==='light')?'vn-btn amber' : (b.act==='shop')?'vn-btn gold' : 'vn-btn';
+  overlay.innerHTML = `<div class="vnwrap">
+    <div class="vn-portraits">
+      ${fig(b.who,'left')}
+      ${b.with? fig(b.with,'right dim'):''}
+    </div>
+    <div class="vn-box">
+      <div class="vn-name">${TUT_NAMES[b.who]||b.who}</div>
+      <div class="vn-text">${b.line}</div>
+      ${link}
+      <div class="vn-cont"><button class="bigbtn ${btnCls}" id="tutBtn" type="button">${label}</button></div>
+    </div>
+    <div class="vn-step">${tutIx+1} / ${TUT.length}</div>
   </div>`;
   $('tutBtn').onclick=()=>tutAct(b);
 }
 function tutAct(b){
   audioOn();
-  if(b.act==='salary'){ save.money=90; saveProgress(); }
+  if(b.act==='salary'){ save.money=20; saveProgress(); }
   if(b.act==='shop'){ _shopReturn='tutorial'; state='shop'; renderShop(); return; }
   if(b.act==='begin'){ save.tutDone=true; save.pollTier=Math.max(1,save.pollTier); saveProgress(); levelIdx=0; startLevel(); return; }
   tutIx++; renderTutorial();
@@ -688,8 +704,9 @@ function newGame(idx){
         // PROBE TRIALS (CS-alone test): read-only measurement of the conditioned response. Writes nothing scored.
         probeHistory:[], lastProbe:null, probeScene:null, isExtraProbe:false,
         // ONBOARDING (Season 1 only): reveal the belief meter and the CS/US/CR labels one at a time, as each first matters.
-        onboard:(L.id===1), coach:null,
-        reveal:(L.id===1? {belief:false,cs:false,us:false,cr:false} : {belief:true,cs:true,us:true,cr:true}),
+        onboard:(L.id===1 && !save.uiTaught), coach:null,
+        reveal:(L.id===1? {cs:false,us:false,cr:false,gauge:false,boats:false,catch:false,squalls:false,meter:false}
+                        : {cs:true,us:true,cr:true,gauge:true,boats:true,catch:true,squalls:true,meter:true}),
         pools:{ calm:SKYPOOL.calm.slice(), mid:SKYPOOL.mid.slice(), heavy:SKYPOOL.heavy.slice(),
                 bLo:BARKS.lo.slice(), bMd:BARKS.md.slice(), bHi:BARKS.hi.slice(), bMiss:BARKS.miss.slice() } };
   if(L.decoyNights){
@@ -705,7 +722,14 @@ function newGame(idx){
 function rollNight(){
   G.decided=false; G.outcome=null; G.lit=false; G.moored=null; G.decoyMoored=null; G.musterPhase=0; G.reinforced=null;
   G.musterAnswered=false; G.musterCall=null; G.lastMuster=null;
-  G.coach=null;   // onboarding notes live for one night only (the belief meter is now the Gazette purchase, revealed in the tutorial)
+  G.coach=null;   // onboarding notes live for one night only
+  if(G.onboard){   // Season 1: introduce one piece of the screen per night, each with a plain callout
+    const r=G.reveal;
+    if(G.night===1 && !r.gauge){ r.gauge=true; G.coach='See the dial just below? That is your barometer. It leans toward STORM when a storm is likely tonight, and toward CALM when it is not. Read it, then light the lamp to warn the crews, or leave it dark and let them fish.'; }
+    else if(G.night===2 && !r.boats){ r.boats=true; r.squalls=true; G.coach='New up top: your boats, and how many big storms the almanac expects this season. If you lose every boat, the season is over, so warning the crews at the right time keeps them safe.'; }
+    else if(G.night===3 && !r.catch){ r.catch=true; G.coach='New up top: your catch. The town needs enough fish to make it through winter. Every night the crews stay in port, they land nothing, so you cannot warn them for no reason.'; }
+    else if(G.night===4 && !r.meter){ r.meter=true; G.coach='Last piece: the trust bar you bought the newspaper for. It shows how much the crews believe your lamp. Above the line, they heed it. Warn them true and watch it climb.'; if(!TESTMODE){ save.uiTaught=true; saveProgress(); } }
+  }
   const L=G.lev, last = G.night===L.nights;
   G.finale = last;
   G.inQuiet = !!(L.quiet && G.night>=L.quiet[0] && G.night<=L.quiet[1]);
@@ -1144,13 +1168,13 @@ function renderDecision(){
   { const bm=$('bMenu'); if(bm) bm.hidden=false; }
   updateCoins();
   const L=G.lev, op=isOperant(L);
-  const coachHTML = G.coach ? '<div style="margin-top:7px;color:#f5d98a;background:rgba(245,193,78,.10);border:1px solid rgba(245,193,78,.42);border-radius:8px;padding:7px 11px;font-family:\'Spectral\',serif;font-size:13px;line-height:1.5;text-align:left">'+G.coach+'</div>' : '';
-  if(G.onboard){   // Season 1: the labels appear one at a time, as each first matters
+  const coachHTML = G.coach ? '<div style="margin:0 0 8px;color:#3a2c10;background:#f5d98a;border:2px solid var(--lampDk);border-radius:9px;padding:9px 13px;font-family:\'Spectral\',serif;font-size:14px;line-height:1.5;text-align:left;box-shadow:0 3px 12px rgba(0,0,0,.3)">👉 '+G.coach+'</div>' : '';
+  if(G.onboard){   // Season 1: the callout leads; the CS/US/CR labels build up beneath it, one at a time
     const parts=[];
     if(G.reveal.cs) parts.push('🔦 the lamp = the signal <b>(CS)</b>');
     if(G.reveal.us) parts.push('⛈ the storm = the danger it warns of <b>(US)</b>');
     if(G.reveal.cr) parts.push('⚓ the crew staying in = the learned response <b>(CR)</b>');
-    $('legend').innerHTML = parts.join(' &nbsp;·&nbsp; ') + coachHTML;
+    $('legend').innerHTML = coachHTML + parts.join(' &nbsp;·&nbsp; ');
     $('legend').hidden = (parts.length===0 && !G.coach);
   } else {
     $('legend').hidden = false;
@@ -1164,6 +1188,10 @@ function renderDecision(){
   $('sBoats').textContent = G.boats>0 ? '⛵'.repeat(G.boats) : '·';
   $('sSquall').previousElementSibling.textContent = op? 'Rations' : 'Squalls';
   $('sSquall').textContent = op? (G.rations+' of '+L.rations) : (G.stormsSpent+' / '+L.deckStorms);
+  // Season 1 onboarding: HUD tiles appear one at a time (see rollNight); everything shows normally otherwise
+  $('tBoats').hidden = G.onboard && !G.reveal.boats;
+  $('tCatch').hidden = G.onboard && !G.reveal.catch;
+  $('tSquall').hidden = G.onboard && !G.reveal.squalls;
   // catch bar
   const frac=Math.min(1,G.catch/L.catchTarget);
   $('cFill').style.width=(frac*100)+'%';
@@ -1176,7 +1204,7 @@ function renderDecision(){
   else if(G.finale){ dc.hidden=false; dc.innerHTML='<b>The night of the Deep.</b>'; }
   else dc.hidden=true;
   renderBelief();
-  $('belief').hidden = !(save.pollTier>=1);   // the belief meter is the Gazette poll: you must buy it to see the crew's trust
+  $('belief').hidden = !(save.pollTier>=1) || (G.onboard && !G.reveal.meter);   // the meter needs the Gazette AND (in S1) its intro callout
   $('log').innerHTML = G.log.slice(-12).map(k=>{
     const t={hit:'right',fa:'cried wolf',miss:'missed',cr:'calm',coFa:'both lit',decoyClear:'stood clear',reinDrill:'rewarded',holdDrill:'held',reinRitual:'mis-rewarded',holdRitual:'saved'}[k]||'·';
     const cls={coFa:'fa',decoyClear:'cr',reinDrill:'hit',holdDrill:'miss',reinRitual:'fa',holdRitual:'cr'}[k]||k;
@@ -1429,7 +1457,7 @@ function renderOverlay(){
         : 'Light the lamp <b>(L)</b> or leave it dark <b>(D)</b>. At a muster, they will heed <b>(R)</b> or they will not <b>(W)</b>. <b>Space</b> moves on.'}</p>
       <div style="margin-top:4px">
         <button class="btn" id="bStart" type="button">${L.id===1?'Light the first night':'Begin the season'}</button>
-        <button class="btn" id="bShop" type="button" style="background:linear-gradient(180deg,#caa24a,#9a7b2e);margin-left:8px">🪙 The chandlery</button>
+        <button class="btn" id="bShop" type="button" style="background:linear-gradient(180deg,#caa24a,#9a7b2e);margin-left:8px">The shop</button>
         ${levelIdx>0?'<button class="btn" id="bPrev" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">◀ Earlier season</button>':''}
         ${levelIdx<LEVELS.length-1?'<button class="btn" id="bFwd" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">Later season ▶</button>':''}
       </div>
@@ -1528,21 +1556,21 @@ function renderOverlay(){
       body:`<p>${L.debrief.body}</p>${conceptMap(L)}<p>${youWatched}</p>` },
     { kicker:'The season, night by night', title:'', visual:'',
       body:`${nightLogTable()}${statline}${mirror}` },
-    { kicker:'Payday', title:'The town shares its catch', visual:imgSlide('coast_map.webp','the harbor'),
-      body:`<p>A season kept safe pays. You earn a keeper's wage, a bonus for reading the crew right and for every boat you brought home, and coin for the surplus fish the town bought past what it needed to eat.</p>
+    { kicker:'Payday', title:'You get paid', visual:imgSlide('coast_map.webp','the harbor'),
+      body:`<p>A safe season pays. You get your keeper's wage, a bonus for reading the crew right and for every boat you brought home, and money for the extra fish the town bought once it had enough to eat.</p>
       <div class="kfacts">
-        <span class="k">wage +${pay.wage}</span>
-        <span class="k">read the crew +${pay.musterCoin}</span>
-        <span class="k">boats home +${pay.hullCoin}</span>
-        ${pay.fishCoin? '<span class="k">surplus fish +'+pay.fishCoin+'</span>':''}
+        <span class="k">wage +$${pay.wage}</span>
+        <span class="k">reading the crew +$${pay.musterCoin}</span>
+        <span class="k">boats saved +$${pay.hullCoin}</span>
+        ${pay.fishCoin? '<span class="k">extra fish +$'+pay.fishCoin+'</span>':''}
       </div>
-      <p><b>+${pay.total} coins.</b> You now hold <b>🪙 ${save.money}</b>.${pay.spoiled? ' <span class="small">('+pay.spoiled+' fish spoiled past your storage; a bigger cellar would keep more.)</span>':''}</p>
+      <p><b>+$${pay.total} this season.</b> You now have <b>$${save.money}</b>.${pay.spoiled? ' <span class="small">('+pay.spoiled+' fish spoiled because your ice cellar was full; a bigger one keeps more.)</span>':''}</p>
       <p class="small">Spend it at the chandlery to sharpen your read of the sky, keep more boats afloat, or measure what you cannot see.</p>` },
     { kicker:'Carry it off the coast', title:'', visual:'',
       body:`<p>${L.debrief.transfer}</p>${sefu}<p class="small">Read more: <a href="${L.debrief.url}" target="_blank" rel="noopener">the psychology behind this season</a> (opens in a new tab).</p>`,
       actions:`${hasNext
         ? `<button class="btn" id="bNext" type="button">Next: ${LEVELS[levelIdx+1].name} ▶</button> <button class="btn" id="bAgain" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">Replay</button>`
-        : `<button class="btn" id="bAgain" type="button">Take this season again</button>`} <button class="btn" id="bShopWin" type="button" style="background:linear-gradient(180deg,#caa24a,#9a7b2e)">🪙 Shop</button> <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">⚓ Harbor</button>` },
+        : `<button class="btn" id="bAgain" type="button">Take this season again</button>`} <button class="btn" id="bShopWin" type="button" style="background:linear-gradient(180deg,#caa24a,#9a7b2e)">The shop</button> <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">⚓ Harbor</button>` },
   ];
   renderSlides(winSlides, (ix,last)=>{ if(last){
     if($('bNext')) $('bNext').onclick=()=>{ levelIdx++; state='menu'; renderOverlay(); };
