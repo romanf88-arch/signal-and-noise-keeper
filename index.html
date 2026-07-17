@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Signal &amp; Noise: The Keeper</title>
+<!--
+=====================================================================================
+SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
+1. CORE LOOP: read a noisy sky gauge, LIGHT the lamp (warn; crew fishes nothing) or
+   leave it DARK (crew fishes); storms sink boats caught out; the crew LEARNS whether
+   the lamp is worth believing (hidden trust, Rescorla-Wagner delta rule).
+2. STORMS ARE DEALT, NEVER ROLLED: season 1 = exactly 5 storm cards in 13 nights,
+   stratified [1 in n1-4, 3 in n5-9, 1 in n10-13], shuffled within strata. The gauge
+   is a class-conditional reading: storm nights ~N(0.62,.13), calm ~N(0.38,.13).
+   Randomize order, never outcomes. Finale (n14) is a guaranteed storm outside the deck.
+3. EVIDENCE: on lit nights the crew's response is Binomial(7, heedP(trust)) "moored"
+   count, drawn on the dock; trend line derives ONLY from moored counts; Odell barks
+   key to the same counts; Marisol gossip (trust tercile) fires at musters AFTER the
+   prediction locks. Trust is never a number, bar, or percent before the debrief.
+4. MUSTERS at nights [2,5,8,11,13]: predict whether the crew would heed a lit lamp
+   (scored on disposition trust>=50). WIN = survive the Deep (ring + trust>=50) AND
+   catch >= target AND >= 4 of 5 musters right. Mercy rule ends dead seasons early.
+5. LOSE: boats gone (S2 only; S1 floor 7-5=2), Deep taken, hungry, or misread crew.
+6. KEYS: L light, D dark, R ring/heed, W wave/not, Space next. All buttons real DOM.
+7. EDUCATION: concept named only in the debrief (with the hidden-trust curve reveal
+   + night log); one-shot plain-language insights at first occurrence of each
+   conditioning event; no jargon in play; roman-voice (no em dashes).
+=====================================================================================
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Nunito:wght@600;700;800;900&family=Spectral:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1f2937; --paper:#f6efdd; --edge:#cbb88f; --sea:#16202f; --sky1:#1b2740; --sky2:#2c3d5c;
+    --lamp:#f5c14e; --lampDk:#caa033; --good:#5fb585; --bad:#d2694a; --warn:#e0a23a; --deep:#3f8c87;
+    --text:#dfe6f3; --muted:#9fb0c6;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  [hidden]{ display:none !important; }
+  html,body{ margin:0; padding:0; }
+  body{ font-family:'Nunito',system-ui,Segoe UI,Roboto,Arial,sans-serif; color:var(--text);
+    background:radial-gradient(120% 80% at 50% 0%, #2b3c5c 0%, #161f30 70%, #0f1622 100%);
+    min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:10px; }
+  #wrap{ width:100%; max-width:920px; }
+  #topbar{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px; margin-bottom:8px; min-height:34px; }
+  #topbar .title{ font-family:'Cinzel',serif; font-weight:700; color:#f3ead4; font-size:17px; letter-spacing:.6px; }
+  .tbtns{ display:inline-flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .tbtn{ display:inline-flex; align-items:center; gap:5px; background:var(--paper); border:2px solid var(--edge); border-radius:9px; padding:6px 12px; font-size:13px; font-weight:800; color:var(--ink); cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,.25); font-family:inherit; }
+  .tbtn:hover{ filter:brightness(1.05); } .tbtn:active{ transform:translateY(1px); }
+  .vol{ display:inline-flex; align-items:center; gap:6px; background:var(--paper); border:2px solid var(--edge); border-radius:9px; padding:4px 9px; font-size:13px; color:var(--ink); box-shadow:0 2px 6px rgba(0,0,0,.25); }
+  .vol input[type=range]{ width:78px; accent-color:var(--lampDk); cursor:pointer; }
+  #stagewrap{ position:relative; width:100%; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(8,14,26,.45); border:3px solid #0e1a30; background:#16202f; }
+  #bgvid{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; display:none; }
+  #bgvid.show{ display:block; }
+  canvas#stage{ display:block; width:100%; height:auto; position:relative; z-index:1; }
+  #overlay{ z-index:2; }
+  /* gameplay chrome exists only once a season is underway */
+  #wrap:not(.playing) #hud, #wrap:not(.playing) #belief, #wrap:not(.playing) #deepchip, #wrap:not(.playing) #legend,
+  #wrap:not(.playing) #decide, #wrap:not(.playing) #log, #wrap:not(.playing) #insight, #wrap:not(.playing) #fieldnote{ display:none; }
+  /* story box on the menu: the real experiment behind the season */
+  .story{ background:#fbf4e2; border:2px solid var(--lampDk); border-left-width:6px; border-radius:11px; padding:11px 14px; margin:0 0 12px; }
+  .story .stitle{ font-size:10.5px; font-weight:900; letter-spacing:.7px; text-transform:uppercase; color:#a9802a; margin-bottom:5px; }
+  .story p{ font-family:'Spectral',serif; font-size:14px; line-height:1.55; color:#41372b; margin:0 0 7px; }
+  .story p.tie{ color:#5a4a2e; }
+  .story a{ font-size:12.5px; font-weight:800; color:#8a5a2a; text-decoration:none; }
+  #fieldnote.s3{ background:rgba(46,34,16,.72); border-left-color:#e0b978; }
+  #fieldnote.s3 .pill{ background:#e0b978; } #fieldnote.s3 .lens{ color:#c9a86f; } #fieldnote.s3 .txt b{ color:#f0d59a; }
+  /* HUD */
+  #hud{ display:grid; grid-template-columns:1fr 1fr 1.4fr 1fr; gap:8px; margin-top:9px; }
+  .stat{ background:rgba(16,24,40,.55); border:2px solid var(--edge); border-radius:11px; padding:8px 10px; text-align:center; }
+  .stat .lab{ font-size:10.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
+  .stat .val{ font-size:19px; font-weight:900; color:#fff; line-height:1.2; }
+  .stat .boats{ font-size:18px; letter-spacing:1px; }
+  /* catch bar */
+  .cbar{ position:relative; height:12px; background:rgba(255,255,255,.13); border-radius:7px; margin-top:6px; overflow:visible; }
+  .cbar .cfill{ position:absolute; inset:0 auto 0 0; width:0; background:linear-gradient(90deg,#4f8f9a,#5fb585); border-radius:7px; transition:width .4s cubic-bezier(.2,.7,.2,1); }
+  .cbar.done .cfill{ background:linear-gradient(90deg,#d8a13a,#f5c14e); box-shadow:0 0 10px rgba(245,193,78,.5); }
+  .cbar .notch{ position:absolute; top:-3px; bottom:-3px; width:2px; background:#fff; opacity:.85; }
+  .cbar .notch::after{ content:'🐟'; position:absolute; top:-15px; left:50%; transform:translateX(-50%); font-size:10px; }
+  /* deep chip */
+  #deepchip{ margin-top:8px; text-align:center; font-family:'Spectral',serif; font-style:italic; font-size:13px; color:#8fb0c9;
+    background:rgba(10,18,32,.55); border:1px solid #24405c; border-radius:9px; padding:4px 10px; }
+  #deepchip b{ color:#bcd7ea; }
+  /* belief meter: watch the conditioning take hold */
+  #belief{ margin-top:9px; background:rgba(16,24,40,.55); border:2px solid var(--edge); border-radius:11px; padding:10px 12px 9px; }
+  #belief .brow{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  #belief .blab{ font-size:11px; font-weight:800; letter-spacing:.4px; text-transform:uppercase; color:var(--muted); }
+  #belief .blab.amber{ color:#d3ab72; }
+  #belief .bnote{ font-size:11px; font-weight:800; color:#cfd9ea; white-space:nowrap; }
+  #belief .bar{ position:relative; height:16px; background:rgba(255,255,255,.12); border-radius:9px; margin:6px 0 3px; }
+  #belief .fill{ position:absolute; inset:0 auto 0 0; width:0; border-radius:9px; transition:width .55s cubic-bezier(.2,.7,.2,1); background:linear-gradient(90deg,var(--warn),var(--good)); }
+  #belief .fill.amber{ background:linear-gradient(90deg,#a9762e,#e6bd7f); }
+  #belief .heed{ position:absolute; top:-3px; bottom:-3px; width:2px; background:#fff; opacity:.85; }
+  #belief .heed::after{ content:'they heed'; position:absolute; top:-13px; left:50%; transform:translateX(-50%); white-space:nowrap; font-size:8.5px; font-weight:800; color:#cfd9ea; }
+  #belief .bar2row{ margin-top:9px; }
+  #belief .hint{ font-family:'Spectral',serif; font-size:12.5px; color:#cfd9ea; margin-top:7px; min-height:16px; }
+  /* decision */
+  #decide{ margin-top:11px; text-align:center; }
+  #sky{ max-width:420px; margin:0 auto 10px; }
+  .skytop{ display:flex; justify-content:space-between; align-items:baseline; font-size:10.5px; font-weight:800; letter-spacing:.6px; color:var(--muted); }
+  .skytop .skytitle{ font-family:'Cinzel',serif; font-size:12px; letter-spacing:.5px; color:var(--lamp); text-transform:none; }
+  .skybar{ position:relative; height:16px; margin-top:5px; border-radius:9px; overflow:hidden;
+    background:linear-gradient(90deg,#4f8f9a 0%,#5fb585 22%,#e0a23a 60%,#d2694a 100%); box-shadow:inset 0 1px 3px rgba(0,0,0,.4); }
+  .skyneedle{ position:absolute; top:-4px; bottom:-4px; width:4px; left:0; background:#fff; border-radius:2px; box-shadow:0 0 6px rgba(0,0,0,.6); transition:left .35s cubic-bezier(.2,.7,.2,1); }
+  .skyneedle::after{ content:'▲'; position:absolute; top:-13px; left:50%; transform:translateX(-50%); color:#fff; font-size:10px; }
+  #cueline{ font-family:'Spectral',serif; font-size:16px; color:#eef2fa; min-height:46px; line-height:1.45; }
+  #cueline b{ color:var(--lamp); }
+  #cueline .bark{ display:flex; gap:9px; align-items:center; justify-content:center; margin-top:7px; font-size:14.5px; color:#d8e2f2; }
+  #cueline .bark img{ width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid var(--lampDk); flex:none; }
+  .btnrow{ display:flex; gap:12px; justify-content:center; margin-top:8px; flex-wrap:wrap; }
+  .big{ border:none; cursor:pointer; font-family:inherit; font-weight:900; font-size:17px; padding:13px 24px; border-radius:13px; color:#fff; position:relative;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.25), 0 4px 0 rgba(0,0,0,.28), 0 6px 14px rgba(0,0,0,.3); transition:transform .1s; }
+  .big:hover{ transform:translateY(-2px); } .big:active{ transform:translateY(2px); }
+  .big.light{ background:linear-gradient(180deg,#f5c14e,#d8a13a); color:#3a2a08; }
+  .big.dark{ background:linear-gradient(180deg,#5a6678,#3c4658); }
+  .big .sub{ display:block; font-size:11px; font-weight:700; opacity:.85; margin-top:2px; }
+  .big:disabled{ opacity:.4; cursor:default; transform:none; }
+  #next{ background:linear-gradient(180deg,#56a07e,#3c7a5d); }
+  #next .ring{ position:absolute; inset:-5px; border:3px solid rgba(255,255,255,.65); border-radius:16px; pointer-events:none; opacity:0; }
+  #next.auto .ring{ opacity:1; animation:shrinkring 2.5s linear forwards; }
+  @keyframes shrinkring{ from{ clip-path:inset(0 0 0 0); } to{ clip-path:inset(0 0 0 100%); } }
+  /* outcome log */
+  #log{ margin-top:11px; display:flex; flex-wrap:wrap; gap:5px; justify-content:center; }
+  .chip{ font-size:11px; font-weight:800; padding:3px 8px; border-radius:20px; color:#13202e; }
+  .chip.hit{ background:#8fd3ab; } .chip.fa{ background:#ecb6a6; } .chip.miss{ background:#e4a06a; } .chip.cr{ background:#c9d2df; }
+  /* keeper's log insight */
+  #insight{ margin:10px auto 0; max-width:480px; background:#fff7e2; border:2px solid var(--lampDk); border-left-width:6px; border-radius:9px; padding:9px 13px; text-align:left; }
+  #insight .lab{ font-size:9.5px; font-weight:900; letter-spacing:.7px; text-transform:uppercase; color:#a9802a; display:block; margin-bottom:2px; }
+  #insight .txt{ font-family:'Spectral',serif; font-size:13.5px; line-height:1.5; color:#4a3d2a; }
+  /* the psychology lens: a live academic label under the story, every conditioning night */
+  #legend{ margin-top:8px; text-align:center; font-size:11px; color:#9fb4cc; line-height:1.5; }
+  #legend b{ color:#cfe0f2; }
+  #fieldnote{ margin:9px auto 0; max-width:480px; background:rgba(20,42,52,.72); border:1px solid #2f6b78; border-left:5px solid #4fb0c4; border-radius:9px; padding:8px 12px; text-align:left; }
+  #fieldnote .pill{ display:inline-block; font-size:9.5px; font-weight:900; letter-spacing:.7px; text-transform:uppercase; color:#0c1c22; background:#5fc6d8; border-radius:20px; padding:2px 9px; margin-bottom:4px; }
+  #fieldnote .lens{ font-size:9px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:#6fb9c9; margin-left:6px; }
+  #fieldnote .txt{ display:block; font-family:'Spectral',serif; font-size:13.5px; line-height:1.5; color:#dbeaf0; }
+  #fieldnote .txt b{ color:#8fe0ef; font-style:normal; }
+  .dmap{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+  .dmap .m{ flex:1 1 150px; background:#eef6ee; border:2px solid #7fb6a0; border-radius:10px; padding:8px 11px; }
+  .dmap .m b{ color:#2c6b5a; } .dmap .m .t{ font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.5px; color:#4a8b78; }
+  @keyframes drawline{ from{ stroke-dashoffset:1400; } to{ stroke-dashoffset:0; } }
+  @media (prefers-reduced-motion: no-preference){ .curveline{ stroke-dasharray:1400; animation:drawline 1.3s ease-out forwards; } }
+  /* overlay + panels */
+  #overlay{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:18px; background:rgba(8,12,22,.66); backdrop-filter:blur(2px); }
+  #overlay.titlescreen{ background:radial-gradient(120% 90% at 50% 32%, rgba(10,16,28,.28), rgba(8,12,22,.74)); backdrop-filter:none; }
+  .titlecard{ text-align:center; color:#eaf0fb; max-width:560px; padding:4px 16px; }
+  .titlecard .wm{ font-family:'Cinzel',serif; font-weight:700; letter-spacing:2px; font-size:clamp(34px,7vw,52px); line-height:.92; margin:0;
+    background:linear-gradient(180deg,#fff3cf 0%,#f4cc63 46%,#caa033 72%,#8f6f22 100%); -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:transparent; filter:drop-shadow(0 2px 1px rgba(0,0,0,.55)) drop-shadow(0 0 24px rgba(245,193,78,.22)); }
+  .titlecard .sub{ font-family:'Cinzel',serif; font-weight:600; color:#e9eefb; font-size:14px; letter-spacing:3px; text-transform:uppercase; margin:9px 0 0; text-shadow:0 1px 8px rgba(0,0,0,.8); }
+  .titlecard .rule{ width:120px; height:1px; background:linear-gradient(90deg,transparent,#caa033,transparent); margin:9px auto 0; }
+  .titlecard .hook{ font-family:'Spectral',serif; font-style:italic; color:#cfdaee; font-size:14.5px; max-width:430px; margin:13px auto 0; line-height:1.65; text-shadow:0 1px 7px rgba(0,0,0,.85); }
+  .titlecard .hook p{ margin:0 0 4px; }
+  .titlecard .bigbtn{ border:none; cursor:pointer; font-family:'Nunito',sans-serif; font-weight:900; font-size:19px; padding:14px 36px; border-radius:13px; color:#3a2a08; background:linear-gradient(180deg,#f5c14e,#d8a13a); box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 5px 0 rgba(0,0,0,.28),0 8px 18px rgba(0,0,0,.35); margin-top:18px; }
+  .titlecard .bigbtn:hover{ transform:translateY(-2px); } .titlecard .bigbtn:active{ transform:translateY(2px); }
+  .panel{ background:var(--paper); border:3px solid var(--edge); border-radius:18px; box-shadow:0 10px 30px rgba(8,14,26,.5); max-width:560px; width:100%; padding:22px 24px; color:#473d4a; max-height:100%; overflow:auto; }
+  .panel h1{ font-family:'Cinzel',serif; font-size:26px; color:var(--ink); margin:0 0 4px; }
+  .panel h2{ font-family:'Cinzel',serif; font-size:22px; color:var(--ink); margin:0 0 8px; }
+  .panel h3{ font-size:12.5px; color:#2c5b66; margin:15px 0 5px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; }
+  .panel p{ font-size:15px; line-height:1.55; margin:0 0 10px; }
+  .panel .prose{ font-family:'Spectral',serif; font-size:16px; line-height:1.6; color:#3b3340; }
+  .panel .small{ font-size:13px; color:#7a7282; }
+  .panel .btn{ border:none; cursor:pointer; font-family:inherit; font-weight:800; font-size:16px; padding:12px 22px; border-radius:12px; color:#fff;
+    background:linear-gradient(180deg,#4a8b9a,#2c5b66); box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 4px 0 rgba(0,0,0,.22); margin-top:8px; }
+  .panel a{ color:#2c5b66; }
+  .kfacts{ display:flex; gap:10px; flex-wrap:wrap; margin:6px 0; }
+  .kfacts .k{ background:#fff7e2; border:2px solid var(--lampDk); border-radius:10px; padding:7px 11px; font-size:13px; color:#473d4a; font-weight:700; }
+  /* night-log table (debrief) */
+  .nlog{ width:100%; border-collapse:collapse; margin:6px 0 10px; font-size:11.5px; }
+  .nlog th{ text-align:center; font-weight:800; color:#7a7282; padding:2px 3px; border-bottom:1px solid var(--edge); }
+  .nlog td{ text-align:center; padding:2px 3px; color:#473d4a; border-bottom:1px solid #eadfc3; }
+  :focus-visible{ outline:3px solid var(--lamp); outline-offset:2px; }
+  .vh{ position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%); }
+  @media (max-width:560px){
+    body{ padding:6px; }
+    .big{ font-size:16px; padding:14px 12px; flex:1 1 44%; min-height:56px; }
+    .big .sub{ font-size:10.5px; }
+    #cueline{ font-size:15px; min-height:40px; }
+    #hud{ grid-template-columns:1fr 1fr; }
+    .panel{ padding:16px 15px; }
+    #overlay{ padding:10px; }
+    .titlecard .wm{ font-size:clamp(30px,9vw,44px); }
+    .btnrow{ gap:8px; }
+    #topbar .title{ font-size:15px; }
+    .panel .btn{ font-size:15px; padding:12px 16px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <div class="title">Signal &amp; Noise</div>
+    <div class="tbtns">
+      <button id="bMenu" class="tbtn" type="button" hidden aria-label="Leave the season and return to the harbor">⚓ Harbor</button>
+      <span class="vol" title="Music volume">🎵<input id="vol" type="range" min="0" max="100" value="60" aria-label="Music volume"></span>
+    </div>
+  </div>
+  <div id="stagewrap">
+    <video id="bgvid" muted loop autoplay playsinline preload="auto" aria-hidden="true"></video>
+    <canvas id="stage" width="760" height="320" tabindex="0" aria-label="The harbor. Read the sky, then choose to light the lamp or leave it dark."></canvas>
+    <div id="overlay"><div class="panel" id="panel"></div></div>
+  </div>
+
+  <div id="hud">
+    <div class="stat"><div class="lab">Night</div><div class="val" id="sNight">1 / 14</div></div>
+    <div class="stat"><div class="lab">Boats</div><div class="val boats" id="sBoats">⛵⛵⛵⛵⛵⛵⛵</div></div>
+    <div class="stat"><div class="lab">Catch</div><div class="cbar" id="cBar"><div class="cfill" id="cFill"></div><div class="notch" id="cNotch"></div></div><div class="lab" id="cLab" style="margin-top:4px;text-transform:none"></div></div>
+    <div class="stat"><div class="lab">Squalls</div><div class="val" id="sSquall">0 / 5</div></div>
+  </div>
+  <div id="deepchip" hidden></div>
+
+  <div id="belief">
+    <div class="brow"><span class="blab" id="bLab">The crew’s belief in your lamp</span><span class="bnote" id="bNote"></span></div>
+    <div class="bar"><div class="fill" id="bFill"></div><div class="heed" id="bHeed"></div></div>
+    <div id="bRow2" hidden>
+      <div class="brow bar2row"><span class="blab amber">Their belief in Sefu’s lantern</span><span class="bnote" id="bNote2"></span></div>
+      <div class="bar"><div class="fill amber" id="bFill2"></div><div class="heed" id="bHeed2"></div></div>
+    </div>
+    <div class="hint" id="bHint"></div>
+  </div>
+  <div id="legend">🔦 the lamp = the signal <b>(CS)</b> &nbsp;·&nbsp; ⛈ the storm = the danger it warns of <b>(US)</b> &nbsp;·&nbsp; ⚓ the crew mooring = the learned response <b>(CR)</b></div>
+
+  <div id="decide">
+    <div id="sky" hidden>
+      <div class="skytop"><span>CALM</span><span class="skytitle">tonight's sky</span><span>STORM</span></div>
+      <div class="skybar"><div class="skyneedle" id="skyNeedle"></div></div>
+    </div>
+    <div id="cueline">Reading the sky&hellip;</div>
+    <div class="btnrow" id="musterRow" hidden>
+      <button class="big light" id="btnRing" type="button">They will heed<span class="sub">the lamp holds them in</span></button>
+      <button class="big dark" id="btnWave" type="button">They will not<span class="sub">they sail out anyway</span></button>
+    </div>
+    <div class="btnrow" id="choiceRow">
+      <button class="big light" id="btnLight" type="button">Light the lamp<span class="sub">warn them to stay in</span></button>
+      <button class="big dark" id="btnDark" type="button">Leave it dark<span class="sub">let them fish</span></button>
+    </div>
+    <div class="btnrow" id="nextRow" hidden>
+      <button class="big" id="next" type="button">Next night<span class="ring"></span></button>
+    </div>
+  </div>
+  <div id="fieldnote" hidden></div>
+  <div id="insight" hidden></div>
+  <div id="log" aria-hidden="true"></div>
+  <div id="sr" role="status" aria-live="polite" class="vh"></div>
+</div>
+
+<script>
+"use strict";
+/* ============================ CONFIG ============================ */
+const CONFIG = {
+  // Rescorla-Wagner trust update. FROZEN AS A SET with the deck strata + muster nights:
+  // changing any one requires re-running the full policy battery (see spec comment).
+  aRight: 0.20,            // lit + storm: trust rises toward 100
+  aWolf: 0.08,             // lit + calm: cried wolf
+  aMiss: 0.08,             // dark + storm: the lamp said nothing
+  s1Decay: 0.12,           // unreinforced nights leak a little belief
+  heedSpread: 4,           // logistic spread of heed probability around the threshold
+  crewN: 7,                // the seven crews whose moorings are the visible evidence
+  catchPerNight: 10,
+  gaugeStorm: 0.62, gaugeCalm: 0.38, gaugeSd: 0.13,   // signal-detection gauge (d' = 1.85)
+  beatMs: 700,             // resolve beats: dock answers, then the weather
+  bellMs: 600,             // the muster bell holds the room
+  autoMs: 2500,            // quiet-night auto-advance
+};
+const W = 760, H = 320, STEP = 1/60;
+function heedProb(trust, thresh){ return 1/(1+Math.exp(-(trust-thresh)/CONFIG.heedSpread)); }
+/* ============================ RNG ============================ */
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+let rng = mulberry32(((Math.random()*1e9)|0) || 7);
+function gauss(){ let u=0,v=0; while(!u)u=rng(); while(!v)v=rng(); return Math.sqrt(-2*Math.log(u))*Math.cos(6.28318*v); }
+function binom(n,p){ let k=0; for(let i=0;i<n;i++) if(rng()<p) k++; return k; }
+/* ============================ ASSETS ============================ */
+const IMG = {};
+['bg_starlit','bg_storm','bg_dusk','bg_dawn','bg_harbor_fog','boat','deep','crew','coast_map','lighthouse_interior','portrait_marisol','portrait_odell','portrait_previous'].forEach(k=>{
+  const im=new Image(); im.onload=()=>{ if(im.naturalWidth>2){ IMG[k]=im; if(typeof state!=='undefined' && (state==='menu'||state==='title') && typeof renderOverlay==='function') renderOverlay(); } };
+  im.onerror=()=>{}; im.src='assets/'+k+'.webp'; });
+/* background video layer (title: menu_loop; finale: deep_rising) */
+(function(){ const v=document.getElementById('bgvid'); if(!v) return; v.muted=true;
+  v.onerror=()=>{ if(v.src.indexOf('menu_loop')>=0){ v.onerror=null; v.dataset.key='background_video'; v.src='assets/background_video.mp4'; } };
+  const kick=()=>{ if(v.classList.contains('show')){ const p=v.play&&v.play(); if(p&&p.catch) p.catch(()=>{}); } };
+  v.oncanplay=kick;
+  ['pointerdown','keydown','touchstart'].forEach(ev=>addEventListener(ev,kick,{once:true}));
+  v.dataset.key='menu_loop'; v.src='assets/menu_loop.mp4'; })();
+function showBgVideo(on, key){ const v=document.getElementById('bgvid'); if(!v) return;
+  if(key && v.dataset.key!==key){ v.dataset.key=key; v.src='assets/'+key+'.mp4'; }
+  v.classList.toggle('show',on);
+  if(on){ const p=v.play&&v.play(); if(p&&p.catch) p.catch(()=>{}); } else { try{ v.pause(); }catch(e){} } }
+function bgVideoLive(){ const v=document.getElementById('bgvid'); return v && v.classList.contains('show') && v.readyState>=2; }
+/* ============================ AUDIO ============================ */
+let AC=null, musicGain=null, musicVol=0.6;
+function audioOn(){ if(AC) return; try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ AC=null; return; }
+  musicGain=AC.createGain(); musicGain.gain.value=0.06*musicVol; musicGain.connect(AC.destination);
+  const buf=AC.createBuffer(1,AC.sampleRate*2,AC.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  const wind=AC.createBufferSource(); wind.buffer=buf; wind.loop=true; const wf=AC.createBiquadFilter(); wf.type='lowpass'; wf.frequency.value=480;
+  const lfo=AC.createOscillator(); lfo.frequency.value=0.08; const lfg=AC.createGain(); lfg.gain.value=160; lfo.connect(lfg).connect(wf.frequency);
+  wind.connect(wf).connect(musicGain);
+  try{ wind.start(); lfo.start(); }catch(e){}
+}
+function setVol(v){ musicVol=Math.max(0,Math.min(1,v)); if(musicGain) musicGain.gain.value=0.06*musicVol; if(themeEl) themeEl.volume=0.35*musicVol; }
+function blip(freq,dur,type,vol,delay){ if(!AC) return; const t=AC.currentTime+(delay||0); const o=AC.createOscillator(),g=AC.createGain();
+  o.type=type||'sine'; o.frequency.value=freq; g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol||0.16,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+(dur||0.15)); o.connect(g).connect(AC.destination); o.start(t); o.stop(t+(dur||0.15)+0.02); }
+const snd = {
+  light(){ blip(560,0.08,'sine',0.12); blip(840,0.12,'sine',0.10,0.05); },
+  dark(){ blip(300,0.10,'sine',0.10); },
+  good(){ [523,659,784].forEach((f,i)=>blip(f,0.18,'sine',0.14,i*0.09)); },
+  bad(){ blip(300,0.22,'sawtooth',0.10); blip(150,0.4,'sine',0.12,0.02); },
+  storm(){ if(!AC) return; const buf=AC.createBuffer(1,AC.sampleRate*0.5,AC.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(AC.sampleRate*0.18)); const s=AC.createBufferSource(); s.buffer=buf; const g=AC.createGain(); g.gain.value=0.18*musicVol+0.06; const f=AC.createBiquadFilter(); f.type='lowpass'; f.frequency.value=900; s.connect(f).connect(g).connect(AC.destination); s.start(); },
+  foghorn(){ blip(150,0.7,'sine',0.16); blip(151.5,0.7,'sine',0.10); },
+};
+/* real audio files, synth blips as fallback */
+const SND = {};
+['bell','foghorn','cue_storm','page_turn'].forEach(k=>{ const a=new Audio(); a.preload='auto'; a.onerror=()=>{}; a.src='assets/'+k+'.mp3'; SND[k]=a; });
+let themeEl=null;
+function playSnd(k, vol){ const a=SND[k]; if(!a || a.readyState===0) return false;
+  try{ const c=a.cloneNode(); c.volume=Math.min(1,(vol!=null?vol:0.5)); c.play().catch(()=>{}); return true; }catch(e){ return false; } }
+function theme(on){
+  if(on && !themeEl){ themeEl=new Audio(); themeEl.loop=true; themeEl.preload='auto'; themeEl.onerror=()=>{ themeEl=null; }; themeEl.src='assets/theme_main.mp3'; }
+  if(themeEl){ themeEl.volume=0.35*musicVol; if(on){ themeEl.play().catch(()=>{}); } else { try{ themeEl.pause(); }catch(e){} } }
+}
+/* ============================ COPY POOLS ============================ */
+// sky lines: 4+ per band, consumed without replacement per season (no verbatim repeats)
+const SKYPOOL = {
+  calm: [
+    'The glass holds steady and the stars are out.',
+    'A soft offshore breeze. The water lies down flat.',
+    'Gulls roost easy on the pilings tonight.',
+    'The moon has a clean ring and the swell is long and low.',
+    'Lantern smoke goes straight up from the town chimneys.',
+  ],
+  mid: [
+    'The glass wavers. The air is heavy, but the sky is unsure.',
+    'A crossing swell, and the wind cannot pick a direction.',
+    'Halfway to dark the horizon smudges, then clears again.',
+    'The cat will not leave the tower. The glass says little.',
+    'Spray on the west rocks, calm in the roads. Hard to say.',
+  ],
+  heavy: [
+    'The glass has dropped hard and the horizon is black.',
+    'The gulls went inland at dusk and did not come back.',
+    'A green line under the clouds, and the swell is building.',
+    'Wind backing to the northeast, and the roads have gone to chop.',
+    'Thunder somewhere past the shelf. The water has gone dark.',
+  ],
+};
+function skyBand(s){ return s>=0.55? 'heavy' : s>=0.40? 'mid' : 'calm'; }
+function skyOdds(s){
+  if(s>=0.8) return 'almost certainly a storm';
+  if(s>=0.62) return 'a storm looks likely';
+  if(s>=0.42) return 'it could go either way';
+  if(s>=0.24) return 'probably calm, but not certain';
+  return 'almost surely a calm night';
+}
+// outcome repeats: first occurrence keeps full prose; repeats use short variants
+const REPEATS = {
+  hit: ['The lamp held. They put a little more in it.','Warned, and the storm came. The lamp is earning its keep.','The light was right again.'],
+  fa: ['A false alarm. The belief you are building thins.','Nothing came. Another lit night the sea did not answer.','A quiet night wasted under a burning lamp.'],
+  miss: ['A storm, no warning. A boat is lost.','The lamp stayed dark and the sea did not. A boat is gone.','Caught out with no light burning. One boat fewer.'],
+  cr: ['A calm night, fished well.','The fleet worked the banks and came home low in the water.','Nets full, weather kind.'],
+};
+// Odell barks: keyed to the MOORED COUNT (the same evidence the dock shows), ~60% of lit nights
+const BARKS = {
+  lo: [   // moored <= 2: they defy the lamp
+    'Odell casts off under your light. "The last keeper burned that lamp every night. We fish."',
+    'Odell does not slow. "A lit window is not a warning yet. Not from this tower."',
+  ],
+  md: [   // moored 3-4: they waver
+    'Odell pauses at the rail, eyes on your lamp. "You have been right before. Not often enough yet."',
+    'Odell leaves half his gear on the dock. "Prove it again tonight."',
+  ],
+  hi: [   // moored >= 5: they moor
+    'Odell ties off and heads home. "When your lamp burns, we stay. It has earned that."',
+    'Odell waves up at the tower. "Saved my boat twice this season. I can count."',
+  ],
+  miss: [ // the morning after a dark-lamp storm
+    'Odell at the wreck line. "The lamp stayed dark and the sea did not. Harder to believe it next time."',
+    'Odell does not look up from the nets. Storms the lamp never warned of are the ones the crew remembers.',
+  ],
+};
+// Marisol gossip at musters, AFTER the prediction locks (trust terciles; threshold buried mid-band)
+const GOSSIP = {
+  lo: 'Marisol, quietly: "On the docks they still tell stories about the last keeper. None of them kind."',
+  md: 'Marisol: "Some of them mend nets tonight. Some check the sky themselves. It could go either way."',
+  hi: 'Marisol: "Odell told his boy to watch your window before he watches the sky. That is new."',
+};
+function pickPool(pool){ if(!pool.length) return null; const i=Math.floor(rng()*pool.length); return pool.splice(i,1)[0]; }
+/* ============================ LEVELS ============================ */
+const LEVELS = [
+  { id:1, name:'The Keeper', term:'a conditioned signal',
+    objective:'Read the crew, not just the sky. Call at the musters whether they would heed your lamp, and be right.',
+    back:null,
+    nights:14, deckStorms:5, strata:[[1,4,1],[5,9,3],[10,13,1]],   // [fromNight,toNight,storms]
+    startTrust:26, heedThreshold:50, catchTarget:40, startBoats:7, decay:0, quiet:null,
+    musterNights:[2,5,8,11,13], musterNeed:4,
+    almanac:'Marisol, at the season’s first tide: “The almanac promises five great squalls, and after them the Deep.”',
+    story:{ era:'St. Petersburg, the 1900s',
+      body:'Ivan Pavlov set out to study a dog’s digestion and noticed the animals began to drool before any food arrived, at the footsteps of the man who fed them. So he rang a bell just before each meal, again and again, until the bell alone set the dogs salivating. A sound that had meant nothing came to stand for the food that followed it.',
+      tie:'Your lamp is Pavlov’s bell, the storm is the food, and the crew learning to act on the light is the salivating dog. Warn truly and reliably, and watch the belief build.',
+      url:'https://en.wikipedia.org/wiki/Ivan_Pavlov' },
+    intro:'You keep the only lighthouse on a fog-bound coast. Each night you warn the crew of a storm or let them sail out and fish, and across a season they learn for themselves whether your lamp is worth believing.',
+    debrief:{ body:'You taught the crew to read the lamp. A warning earns belief only when it reliably comes before real danger, and it loses belief every time it cries wolf. Psychologists call a sign that has come to stand for what follows it <b>a conditioned signal</b>, and the learning curve you just built is called <b>acquisition</b>.',
+      transfer:'A fire alarm that goes off for burnt toast twice a week. What happens to how people act on it, and why?',
+      url:'https://nobaproject.com/modules/conditioning-and-learning' } },
+  { id:2, name:'The Quiet Stretch', term:'extinction',
+    objective:'Keep the crew’s belief alive through a long calm, when almost no storm comes to confirm the lamp.',
+    back:'Last season you built the crew’s belief in the lamp. This season you watch what a long quiet does to it.',
+    nights:16, deckStorms:4, strata:[[1,9,0],[10,15,4]],
+    startTrust:56, heedThreshold:50, catchTarget:30, startBoats:7, decay:1.3, quiet:[1,9],
+    musterNights:[2,6,9,12,15], musterNeed:4,
+    almanac:'Marisol: “A thin almanac this year. Four squalls, they say, all riding the year’s end, and a long quiet before them.”',
+    story:{ era:'New York, 1924',
+      body:'Mary Cover Jones took on a boy named Peter who was terrified of a white rabbit, and of most furry things besides. Day after day she set the rabbit a little nearer while Peter ate a snack he liked, and let him watch other children hold it without fear, until the terror drained away. She was among the first to show that a learned fear could be undone, and she is often called the mother of behavior therapy.',
+      tie:'Jones undid a fear by teaching something new in its place. This season shows the plainer cousin of that idea, extinction, where a learned response fades on its own once the thing that taught it stops coming. Your lamp keeps burning with no storm to confirm it, and the crew’s belief leaks away.',
+      url:'https://en.wikipedia.org/wiki/Mary_Cover_Jones' },
+    intro:'A quiet season. The storms have moved offshore, and every calm night the crew asks why the lamp still burns. The belief you built last season came home with them, but a belief that is never put to work does not simply keep.',
+    debrief:{ body:'You watched a belief you had earned fade just from going unused, and you had to spend the rare storms to keep it alive rather than hoard a safe night of fishing. A learned response that stops being borne out weakens and can fade away, a process psychologists call <b>extinction</b>. The lamp still works; its meaning thins every night it goes unconfirmed.',
+      transfer:'You learned to fear a dog that once bit you, then spent years around calm, friendly dogs. What happens to the fear over those years, and why?',
+      url:'https://en.wikipedia.org/wiki/Extinction_(psychology)' } },
+  { id:3, name:'The Two Lights', term:'discrimination',
+    objective:'Two lights burn on the water now. Teach the crew to heed your lamp and ignore Sefu’s look-alike lantern.',
+    back:'Your lamp is believed. But a second light has appeared on the dock, and at first the crew cannot tell it from yours.',
+    nights:16, deckStorms:5, strata:[[1,5,2],[6,10,1],[11,15,2]],
+    decoyNights:[2,4,6,8,10,11,13,14], genInit:1.0, aDecoyExt:0.07, decoyFloor:6, aBlur:0.24, aBlurCalm:0.02,
+    startTrust:62, heedThreshold:50, catchTarget:30, startBoats:7, decay:0.6, quiet:null,
+    musterNights:[4,6,8,11,13,14], musterNeed:9, decoyNeed:4,
+    almanac:'Marisol, over the first tide: “Five squalls in the almanac again, and the Deep at the end. And Sefu will burn that lantern of his most nights, which the almanac has nothing to say about, for it has never once called the weather and never will.”',
+    story:{ era:'Johns Hopkins, 1920',
+      body:'John Watson and Rosalie Rayner showed a baby they called Albert a white rat, and each time he reached for it they struck a steel bar behind his head. Soon the rat alone made him cry, and so did a rabbit, a dog, a fur coat, even a Santa Claus mask. His fear had spread to anything that resembled the rat, a spreading psychologists call generalization.',
+      tie:'Learning to tell the true signal from the look-alikes is the opposite skill, discrimination. Sefu’s lantern resembles your lamp the way the fur coat resembled the rat, and the crew must learn to answer the one light that comes before a storm and ignore the one that never does.',
+      url:'https://en.wikipedia.org/wiki/Little_Albert_experiment' },
+    intro:'Sefu the charm peddler has hung a lantern over his dock stall, and from the water on a dark night it burns the same amber as yours. The crew learned last season that a light means a storm coming, and at first they cannot tell the two lights apart, mooring for his lantern the way they moor for your lamp. Your work this season is to teach them the difference, and the only light you can touch is your own.',
+    debrief:{ body:'You never lit Sefu’s lantern and you never put it out. The choice that mattered was whether to burn your own lamp on the nights his was already lit. Every time you kept the tower dark and let his light stand alone over a calm sea, the crew saw a light come to nothing and fewer moored for it. Every time you co-lit to be safe, the two lights blurred into one and the crew could not tell your warning from his noise. Those early nights, when the meaning of your lamp spread to any light that resembled it, are called <b>generalization</b>. Teaching the crew to answer the light that predicts danger and ignore the one that does not is called <b>discrimination</b>, and a cue they have learned to act on is a <b>discriminative stimulus</b>.',
+      transfer:'A car alarm and a real break-in alert use the same kind of blare. If every false car alarm in the lot goes off next to the one alert that matters, what happens to how people respond over time, and what would you have to do to teach them the difference?',
+      url:'https://en.wikipedia.org/wiki/Stimulus_control' } },
+  { id:4, name:'The Drill', term:'operant conditioning',
+    objective:'You cannot warn the Deep away. Reward the crew on the nights they run the storm drill on their own, until it becomes a habit that holds when the water comes.',
+    back:'The crew believes your lamp. But the Deep gives no warning, so a signal will not save them. Only a drill they run without being told.',
+    nights:16, strata:[], deckStorms:0, quiet:null,
+    startReadiness:15, startRitual:8, aReinforce:0.26, extRate:2.5, aSuper:0.24, sDecay:2, idleDecay:0, ritualR:9,
+    emitGamma:1.5, emitK:34, rations:10, catchPerNight:10, catchDrill:4,
+    heedThreshold:50, catchTarget:40, startBoats:7,
+    musterNights:[3,6,9,12,14], musterNeed:4,
+    almanac:'Marisol, at the first tide: “No squalls in the almanac this year. Just the Deep at the end of it, and it comes without a sign. Ten rations in the stores, and the stores stay shut till spring, so what you give, you give for good.”',
+    story:{ era:'Puzzle boxes to the Skinner box, 1898 to 1948',
+      body:'Edward Thorndike put a hungry cat in a slatted crate with a loop of string that would open the door. The cat clawed and squeezed and flailed until, by accident, it caught the loop and tumbled out to its food. Put back in the box, it flailed a little less, and trial after trial the useless motions dropped away, because escape and food had followed that one act. Thorndike called it the law of effect, that an act followed by a satisfying result is done more often. Fifty years later B.F. Skinner built a box where a rat pressed a lever and a food pellet dropped, and lever-pressing climbed the same way.',
+      tie:'Your crew is the cat in the box, and running the storm drill is the act that the ration follows. Reward the drill and it grows into a habit that acts on its own when the Deep comes. Reward a night they only stood around the deck, and you build a useless ritual in place of the thing that would save them.',
+      url:'https://en.wikipedia.org/wiki/Law_of_effect' },
+    intro:'The Deep is coming, and it gives no warning, no glass to read and no light to raise in time. The only thing that will save the crew is a drill they run on their own, the boats up the ramp and hands on the sea-wall, before the water ever moves. You cannot order it into them, but some nights, on their own, a few of them will run it, and when they do you can make it worth their while with a rum ration, so the ones who did it do it again. You have ten rations for the whole season and the stores stay shut till spring, so spend them on the nights the crew actually drilled, not the nights they only stood around the deck.',
+    debrief:{ body:'You never signaled anything this season. You watched the crew act, and on the nights they ran the drill you made it pay, so a behavior followed by something they valued grew stronger night by night, which psychologists call <b>the law of effect</b>, the heart of <b>operant conditioning</b>. The reward had to <b>follow the drill</b> to build it, and the nights you were tempted to reward an idle crew would have built a <b>superstition</b>, a ritual that holds back nothing when the water comes. On the nights you withheld from a real drill you saw the other edge, <b>extinction</b>, where a drill that stops paying begins to fade.',
+      transfer:'A toddler throws a tantrum in a store and you buy the candy to make it stop, and the tantrums grow more frequent rather than less. Which behavior did the candy reinforce, and what would you have had to reward instead to build the behavior you actually wanted?',
+      url:'https://en.wikipedia.org/wiki/Operant_conditioning' } },
+];
+function isOperant(L){ return L && L.startReadiness!=null; }
+function drillEmit(R,S,L){ const g=L.emitGamma, k=L.emitK; const rp=Math.pow(Math.max(0,R),g), sp=Math.pow(Math.max(0,S),g), kp=Math.pow(k,g); return rp/(rp+sp+kp); }
+let levelIdx=0, maxUnlocked=0;
+try{ const m=+localStorage.getItem('keeperMax'); if(m>=0) maxUnlocked=Math.min(m,LEVELS.length-1); }catch(e){}
+function saveProgress(){ try{ localStorage.setItem('keeperMax',String(maxUnlocked)); }catch(e){} }
+/* ============================ STATE ============================ */
+const canvas=document.getElementById('stage'), ctx=canvas.getContext('2d');
+const overlay=document.getElementById('panel'), overlayWrap=document.getElementById('overlay');
+let state='title';    // 'title' | 'menu' | 'reading' | 'resolved' | 'won' | 'lost'
+let G=null, animTime=0, beatTok=0, autoTok=0;
+const motionOK = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+let TESTMODE=false;
+let shake=0, rain=[], flashT=0;
+// the storm deck: exactly deckStorms storm cards, stratified so no two-hit crossing can
+// happen before night 5. Randomize the ORDER of nights, never the season's storm supply.
+function buildDeckWith(nights, strata, avoid){
+  const deck=Array(nights-1).fill(false);
+  for(const [a,b,k] of strata){
+    const slots=[]; for(let n=a;n<=b;n++){ const i=n-1; if(i>=0 && i<deck.length && !(avoid&&avoid[i])) slots.push(i); }
+    for(let j=0;j<k && slots.length;j++){ const r=Math.floor(rng()*slots.length); deck[slots.splice(r,1)[0]]=true; }
+  }
+  return deck;
+}
+function buildDeck(L){ return buildDeckWith(L.nights, L.strata); }
+function newGame(idx){
+  if(idx!=null) levelIdx=idx;
+  const L=LEVELS[levelIdx];
+  rng = mulberry32(((Math.random()*1e9)|0)||7);
+  G = { lev:L, night:1, boats:L.startBoats, trust:(L.startTrust!=null?L.startTrust:(L.startReadiness||0)), catch:0,
+        decided:false, lit:false, outcome:null, log:[], stats:{hit:0,fa:0,miss:0,cr:0},
+        weatherStorm:false, crewOut:false, sky:0, finale:false, inQuiet:false,
+        isMuster:false, musterAnswered:false, musterCall:null, musterRight:0, musterCount:0, lastMuster:null,
+        moored:null, mooredHistory:[], insights:{}, seen:{}, trustHistory:[(L.startTrust!=null?L.startTrust:(L.startReadiness||0))],
+        stormsSpent:0, nightLog:[],
+        deck:buildDeck(L),
+        // SEASON 3: the decoy (Sefu's lantern) = CS-. A second dealt deck, collision-forbidden with storms.
+        isDecoy:false, vMinus:0, decoySeeded:false, vMinusHistory:[], decoyMooredHistory:[], decoyLit:0,
+        dRight:0, dCount:0, musterPhase:0,
+        // SEASON 4: operant. R = drill readiness (the behavior), S = the idle ritual. Reward what the crew DID.
+        readiness:L.startReadiness||0, ritual:L.startRitual||0, rations:L.rations||0, drilled:null, reinforced:null,
+        emissionShown:true, readinessHistory:[L.startReadiness||0], ritualHistory:[L.startRitual||0],
+        pools:{ calm:SKYPOOL.calm.slice(), mid:SKYPOOL.mid.slice(), heavy:SKYPOOL.heavy.slice(),
+                bLo:BARKS.lo.slice(), bMd:BARKS.md.slice(), bHi:BARKS.hi.slice(), bMiss:BARKS.miss.slice() } };
+  if(L.decoyNights){
+    // Sefu's lantern burns on a fixed schedule that covers every muster night (so each muster is a
+    // two-part read); storms are dealt to AVOID those nights, so the decoy is never a storm's herald.
+    const dd=Array(L.nights-1).fill(false);
+    L.decoyNights.forEach(n=>{ if(n>=1 && n<L.nights) dd[n-1]=true; });
+    G.decoyDeck=dd;
+    G.deck=buildDeckWith(L.nights, L.strata, dd);
+  }
+  rollNight();
+}
+function rollNight(){
+  G.decided=false; G.outcome=null; G.lit=false; G.moored=null; G.decoyMoored=null; G.musterPhase=0; G.reinforced=null;
+  G.musterAnswered=false; G.musterCall=null; G.lastMuster=null;
+  const L=G.lev, last = G.night===L.nights;
+  G.finale = last;
+  G.inQuiet = !!(L.quiet && G.night>=L.quiet[0] && G.night<=L.quiet[1]);
+  G.isMuster = (L.musterNights && L.musterNights.indexOf(G.night)>=0) || last;
+  if(isOperant(L)){
+    // SEASON 4: the crew EMITS a behavior first (the inverted loop). Reward it or bank the ration.
+    G.drillP = drillEmit(G.readiness, G.ritual, L);
+    G.drilled = last ? null : (rng() < G.drillP);
+    G.drillTendency = G.readiness >= L.heedThreshold;
+    G.heedTendency = G.drillTendency;                 // muster scores against this
+    G.emissionShown = !(G.isMuster && !last);          // on a muster night, hide tonight's draw until the prediction locks
+    return;
+  }
+  // tonight's weather is a dealt card; the finale is a guaranteed storm outside the deck
+  G.weatherStorm = last ? true : G.deck[G.night-1];
+  // Sefu's decoy: dealt, collision-free with storms; the finale always shows it (a scripted trap)
+  G.isDecoy = L.decoyNights ? (last ? true : !!(G.decoyDeck && G.decoyDeck[G.night-1])) : false;
+  if(G.isDecoy && !G.decoySeeded){ G.vMinus = L.genInit*L.startTrust; G.decoySeeded=true; }   // generalization seed (from the belief carried in)
+  // the gauge is a class-conditional reading of the true card (signal detection, d'=1.85)
+  G.sky = last ? 0.99 : Math.max(0.02, Math.min(0.98, (G.weatherStorm?CONFIG.gaugeStorm:CONFIG.gaugeCalm) + gauss()*CONFIG.gaugeSd));
+  G.heedP = heedProb(G.trust, L.heedThreshold);
+  G.heedTendency = G.trust >= L.heedThreshold;
+  G.decoyTendency = G.vMinus >= L.heedThreshold;
+  G.isMuster = (L.musterNights && L.musterNights.indexOf(G.night)>=0) || last;
+  // pick tonight's sky line from the band pool (no repeats within a season)
+  if(!last){ const band=skyBand(G.sky); const pool=G.pools[band];
+    G.skyLine = pool.length? pickPool(pool) : (SKYPOOL[band][0]); }
+  // staging: the Deep's video rises on the finale; its horn sounds as the last nights open
+  if(!TESTMODE){
+    if(last) showBgVideo(true,'deep_rising');
+    else if(G.night>=L.nights-2) playSnd('foghorn',0.25);
+  }
+}
+/* ============================ THE MUSTER ============================ */
+function muster(call){
+  if(state!=='reading' || !G.isMuster || G.musterAnswered) return;
+  audioOn();
+  if(G.finale){ if(!playSnd('bell',0.5)) snd.foghorn(); G.musterCall={lamp:call}; G.musterAnswered=true; decide(call); return; }
+  if(isOperant(G.lev)){   // predict the drill first, THEN see tonight's emission and choose to reward
+    if(!playSnd('bell',0.5)) snd.foghorn();
+    G.musterCall={lamp:call}; G.musterAnswered=true; G.emissionShown=true; scoreMuster(); renderDecision(); return;
+  }
+  // phase 0: the tower lamp read; phase 1 (decoy nights only): Sefu's lantern read
+  if(G.musterPhase===0){
+    if(!playSnd('bell',0.5)) snd.foghorn();
+    G.musterCall={lamp:call, decoy:null};
+    if(G.isDecoy){ G.musterPhase=1; renderDecision(); return; }   // a second question follows
+    G.musterAnswered=true; renderDecision(); return;
+  }
+  if(G.musterPhase===1){ playSnd('bell',0.35);
+    G.musterCall.decoy=call; G.musterPhase=2; G.musterAnswered=true; renderDecision(); return;
+  }
+}
+function gossipLine(){
+  const t=G.trust;
+  return t<34? GOSSIP.lo : t<=66? GOSSIP.md : GOSSIP.hi;
+}
+/* ============================ THE DECISION ============================ */
+function decide(arg){
+  if(state!=='reading' || G.decided) return;
+  if(G.isMuster && !G.musterAnswered) return;   // the harbormaster gets her answer first
+  const L=G.lev, thresh=L.heedThreshold;
+  if(isOperant(L)){ return decideOperant(arg); }   // SEASON 4: reward the behavior
+  const lit=arg;
+  audioOn(); G.decided=true; G.lit=lit; lit?snd.light():snd.dark();
+  const storm=G.weatherStorm;
+  if(G.finale){ return resolveFinale(lit); }
+  let moored=null, heedNow=false, dTrust=0, dVMinus=0, kind, head, body, lostBoat=false, earned=0;
+  if(G.isDecoy){
+    // SEASON 3: two lights on the water
+    if(lit){
+      // CO-LIGHT: your lamp beside Sefu's; the crew cannot tell which light the weather answered
+      const blend = 0.5*G.trust + 0.5*G.vMinus + 6;
+      moored = binom(Math.min(G.boats,CONFIG.crewN), heedProb(blend,thresh)); heedNow = moored>=4;
+      G.moored=moored; G.mooredHistory.push(moored);
+      if(storm){ dTrust = L.aBlur*(100-G.trust); dVMinus = L.aBlur*(100-G.vMinus); kind='hit';
+        if(heedNow){ head='Both lights, and a storm.'; body=moored+' of seven made the harbor fast, and the storm passed over empty water. But they moored to the pair of lights, not to yours alone.'; }
+        else { lostBoat=true; G.boats=Math.max(0,G.boats-1); head='Both lights, and a storm.'; body='Only '+moored+' of seven moored, and a boat that sailed past the two lights is gone.'; } }
+      else { dTrust = -L.aBlurCalm*G.trust; dVMinus = -L.aBlurCalm*G.vMinus; kind='coFa';
+        head='Both lights, no storm.'; body='You lit your lamp beside Sefu’s and no storm came. With two lights burning, the crew cannot tell which one to stop believing.'; }
+    } else {
+      // STAND CLEAR: only Sefu's lantern burns, and the crew reads it alone
+      const dm = binom(Math.min(G.boats,CONFIG.crewN), heedProb(G.vMinus,thresh));
+      G.decoyMoored=dm; G.decoyMooredHistory.push(dm);
+      if(storm){ dTrust=-CONFIG.aMiss*G.trust; kind='miss'; lostBoat=true; G.boats=Math.max(0,G.boats-1);
+        head='A storm slipped in.'; body='Sefu’s lantern was never a warning, and a boat was caught out with your lamp dark.'; }
+      else { kind='decoyClear'; earned=CONFIG.catchPerNight; G.catch+=earned;
+        dVMinus = -L.aDecoyExt*(G.vMinus - L.decoyFloor);
+        head='Sefu’s light alone.'; body=dm+' of seven turned for Sefu’s lantern, then went back to the banks when no storm came. His light is learning to mean nothing.'; }
+    }
+    G.crewOut = !(lit && heedNow);
+  } else {
+    // SEASON 1/2: a single light (unchanged)
+    if(lit){ moored=binom(Math.min(G.boats,CONFIG.crewN), G.heedP); heedNow = moored>=4;
+      G.moored=moored; G.mooredHistory.push(moored); }
+    G.crewOut = !(lit && heedNow);
+    if(lit && storm){
+      dTrust = CONFIG.aRight*(100-G.trust); kind='hit';
+      if(heedNow){ head='The lamp held.'; body=moored+' of the seven made the harbor fast on your word, and the storm tore through empty water. They put a little more in the light.'; }
+      else { lostBoat=true; G.boats=Math.max(0,G.boats-1); head='Right, but not yet believed.';
+        body='Your lamp was up and the storm came just as it promised, but only '+moored+' of seven moored. A boat that sailed past your warning is gone. They will remember the light was right.'; }
+    } else if(lit && !storm){
+      dTrust = -CONFIG.aWolf*G.trust; kind='fa'; head='A false alarm.';
+      body = heedNow ? (moored+' of seven held in port on your word, and nothing came. Cry wolf too often and the belief you are building drains away.')
+                     : ('You lit the lamp on a calm night. Only '+moored+' of seven paid it mind, and what little belief you had thins again.');
+    } else if(!lit && storm){
+      dTrust = -CONFIG.aMiss*G.trust; kind='miss'; lostBoat=true; G.boats=Math.max(0,G.boats-1);
+      head='A storm, and no warning.'; body='You left the lamp dark and a storm caught the fleet at sea. A boat is lost, and the crew marks that the light said nothing.';
+    } else {
+      kind='cr'; head='A calm night, well used.'; earned=CONFIG.catchPerNight; G.catch+=earned;
+      body='You let the crew fish a calm night, and they came home full.';
+    }
+  }
+  G.trust = Math.max(0, Math.min(100, G.trust + dTrust));
+  if(dVMinus) G.vMinus = Math.max(0, Math.min(100, G.vMinus + dVMinus));
+  const decay = G.lev.decay || CONFIG.s1Decay;
+  if(decay && kind!=='hit'){ const d=Math.min(G.trust,decay); G.trust-=d; dTrust-=d; }
+  if(G.isDecoy) G.vMinusHistory.push(+G.vMinus.toFixed(1));
+  const statKey = kind==='coFa'?'fa' : kind==='decoyClear'?'cr' : kind;
+  if(G.stats[statKey]!=null) G.stats[statKey]++;
+  if(storm) G.stormsSpent++;
+  scoreMuster();
+  G.trustHistory.push(G.trust);
+  const firstOfKind = !G.seen[kind]; G.seen[kind]=true;
+  const insight = readInsight(kind, heedNow);
+  // brevity ladder: first occurrence keeps the full prose; repeats of the S1/S2 kinds get a short line
+  if(!firstOfKind && !lostBoat && !insight && REPEATS[kind]){ body = REPEATS[kind][Math.floor(rng()*REPEATS[kind].length)]; head=''; }
+  // Odell speaks on ~60% of lit lamp nights (keyed to the moored count) and after misses
+  let bark=null;
+  if(lit && moored!=null && rng()<0.6){ const pool = moored<=2? G.pools.bLo : moored<=4? G.pools.bMd : G.pools.bHi; bark=pickPool(pool); }
+  else if(kind==='miss'){ bark=pickPool(G.pools.bMiss); }
+  G.nightLog.push({ n:G.night, sky:+G.sky.toFixed(2), storm, lit, moored, kind, trust:+G.trust.toFixed(1) });
+  const concept = conceptNote(kind, dTrust, dVMinus, G.lev, G.isDecoy, lit);
+  G.outcome = { kind, head, body, dTrust, lostBoat, earned, storm, heedNow, insight, bark, firstOfKind, concept, moored, decoyMoored:G.decoyMoored };
+  G.log.push(kind);
+  if(insight) playSnd('page_turn',0.4);
+  state='resolved'; presentOutcome();
+}
+// SEASON 4 (operant): reward or bank the ration for the behavior the crew just emitted.
+function decideOperant(reinforce){
+  audioOn(); G.decided=true;
+  const L=G.lev;
+  if(G.finale){ return resolveFinale(reinforce); }
+  if(reinforce && G.rations<=0) reinforce=false;   // an empty ration store cannot reward; the keeper can only hold
+  G.reinforced=reinforce;
+  reinforce? snd.good() : snd.dark();
+  const drilled=G.drilled;
+  let kind, head, body, dR=0, dS=0;
+  if(reinforce && drilled){ dR=L.aReinforce*(100-G.readiness); dS=-L.sDecay; kind='reinDrill';
+    head='You rewarded the drill.'; body='They ran it on their own, and you made it pay. A behavior followed by something they value is done more often.'; }
+  else if(!reinforce && drilled){ dR=-L.extRate; kind='holdDrill';
+    head='You held the ration.'; body='They ran the drill and got nothing for it. A drill that stops paying begins to fade.'; }
+  else if(reinforce && !drilled){ dS=L.aSuper*(100-G.ritual); dR=-(L.ritualR||0); kind='reinRitual';
+    head='A reward with nothing behind it.'; body='They only kept to the deck tonight, so the ration built no drill, only the idle habit you happened to reward, and the crew learns the wrong lesson about what earns your rum.'; }
+  else { dR=-L.idleDecay; dS=-1; kind='holdRitual';
+    head='A quiet night, well used.'; body='There was no drill to reward, so the ration is saved.'; }
+  // the fleet fishes hardest on deck nights; drill nights tie the boats up but still land a little
+  const earned = drilled ? (L.catchDrill||0) : L.catchPerNight; G.catch+=earned;
+  if(reinforce) G.rations=Math.max(0,G.rations-1);
+  G.readiness=Math.max(0,Math.min(100,G.readiness+dR));
+  G.ritual=Math.max(0,Math.min(100,G.ritual+dS));
+  G.readinessHistory.push(+G.readiness.toFixed(1)); G.ritualHistory.push(+G.ritual.toFixed(1));
+  G.trustHistory.push(G.readiness);
+  const firstOfKind=!G.seen[kind]; G.seen[kind]=true;
+  const insight=readInsight(kind, drilled);
+  const concept=conceptNote(kind, dR, dS, L, false, false);
+  G.nightLog.push({ n:G.night, sky:null, storm:false, lit:reinforce, moored:(drilled?'drill':'deck'), kind, trust:+G.readiness.toFixed(1) });
+  G.outcome={ kind, head, body, dTrust:dR, lostBoat:false, earned, storm:false, heedNow:drilled, insight, bark:null, firstOfKind, concept, moored:null, decoyMoored:null };
+  G.log.push(drilled?'hit':'cr');
+  if(insight) playSnd('page_turn',0.4);
+  state='resolved'; presentOutcome();
+}
+// score the muster against the crew's underlying disposition, never a single draw.
+// Season 3 musters are two-part: the tower lamp (V+) and Sefu's decoy (V-).
+function scoreMuster(){
+  if(!G.isMuster || G.finale || !G.musterCall) return;
+  const mc=G.musterCall;
+  const lampRight = (mc.lamp===G.heedTendency);
+  G.musterCount++; if(lampRight) G.musterRight++;
+  let decoyRight=null;
+  if(G.isDecoy && mc.decoy!=null){ decoyRight = (mc.decoy===G.decoyTendency);
+    G.musterCount++; G.dCount++; if(decoyRight){ G.musterRight++; G.dRight++; } }
+  G.lastMuster = { lampCall:mc.lamp, lampRight, decoyCall:mc.decoy, decoyRight, decoyTend:G.decoyTendency };
+}
+function resolveFinale(lit){
+  const thresh=G.lev.heedThreshold, L=G.lev;
+  if(isOperant(L)){
+    // SEASON 4: no warning is possible; the crew survive only if the drill is a self-started habit
+    const strong = G.readiness>=thresh, ritualWon = G.ritual>=G.readiness;
+    const survived = strong && !ritualWon;
+    let head, body;
+    if(survived){ G.crewOut=false; head='They were already moving.';
+      body='No bell, no lamp, no warning. The Deep rises, and the crew are already hauling the boats up the ramp and manning the wall, on their own, because you taught them it pays.'; }
+    else { G.boats=0; head='The Deep took them.';
+      body = ritualWon ? 'The Deep rises, and the crew fall to the same idle habit you kept rewarding, a ritual that holds back nothing, and the water takes them at the rail.'
+                       : 'The Deep rises with no warning, and the crew stand frozen at the rail. The drill never became theirs, and they did not move in time.'; }
+    G.finaleRitualLoss = ritualWon;   // whenever the idle ritual matched or beat the drill, the crew died of superstition
+    G.readinessHistory.push(+G.readiness.toFixed(1)); G.ritualHistory.push(+G.ritual.toFixed(1)); G.trustHistory.push(G.readiness);
+    G.nightLog.push({ n:G.night, sky:null, storm:true, lit:false, moored:(survived?'drill':'deck'), kind:(survived?'hit':'miss'), trust:+G.readiness.toFixed(1) });
+    G.outcome={ kind:survived?'hit':'miss', head, body, dTrust:0, lostBoat:!survived, earned:0, storm:true, heedNow:survived, insight:null, bark:null, firstOfKind:false, concept:null };
+    G.log.push(survived?'hit':'miss');
+    state='resolved'; presentOutcome(); return;
+  }
+  const believed = G.trust >= thresh;                 // the lamp is trusted
+  const decoyPulls = G.isDecoy && G.vMinus >= thresh; // Sefu's light still drags them out (discrimination failed)
+  const willStay = believed && !decoyPulls;
+  let head, body, lostBoat=false;
+  if(lit && willStay){ G.crewOut=false; head='The watch held.';
+    body='The bell carries. One by one the lanterns turn for the harbor. Every night you called right bought this one. The Deep rose into an empty harbor and sank back.'; }
+  else { G.boats=0; lostBoat=true; head='The Deep took them.';
+    body = (lit && decoyPulls) ? 'The bell carries, but half the fleet rows for Sefu’s lantern down the shore, still unable to tell it from your warning, and the Deep took them there.'
+         : lit ? 'The bell carries and the fleet sails past it. Too many lit nights came to nothing. They stopped counting yours.'
+               : 'The lamp is lit nowhere and the bell never rings. Whatever the crew believed, you did not ask them to prove it, and the Deep rose on the fleet at sea.'; }
+  G.finaleDecoyLoss = lit && believed && decoyPulls;
+  G.stats[ willStay&&lit ? 'hit':'miss' ]++;
+  G.trustHistory.push(G.trust); if(G.isDecoy) G.vMinusHistory.push(+G.vMinus.toFixed(1));
+  G.nightLog.push({ n:G.night, sky:null, storm:true, lit, moored:null, kind:(willStay&&lit?'hit':'miss'), trust:+G.trust.toFixed(1) });
+  G.outcome = { kind: willStay&&lit?'hit':'miss', head, body, dTrust:0, lostBoat, earned:0, storm:true, heedNow:willStay, insight:null, bark:null, firstOfKind:false };
+  G.log.push(G.outcome.kind);
+  state='resolved'; presentOutcome();
+}
+/* THE LIVE ACADEMIC LABEL: every conditioning night, name the trial in the field's own terms (CS/US/CR
+   and the process) with a directional pulse. NEVER a running number: that would turn the muster into a
+   lookup and delete the read-the-crew skill. The real magnitude is the debrief curve. */
+function conceptNote(kind, dTrust, dVMinus, lev, isDecoy, lit){
+  const m=Math.abs(dTrust), A=d=>d.repeat(m>=10?3:m>=4?2:1), s2=lev.id===2;
+  // SEASON 4 (operant): name the reinforcement contingency
+  if(lev.id===4){
+    if(kind==='reinDrill') return { term:'the law of effect', s4:true,
+      txt:'The drill (an <b>operant</b> behavior the crew ran on their own) was followed by a reward. Reinforced, it <b>grows stronger '+A('▲')+'</b>.' };
+    if(kind==='holdDrill') return { term:'extinction', s4:true,
+      txt:'The crew drilled and got nothing for it. A behavior that stops paying off <b>fades '+A('▽')+'</b>.' };
+    if(kind==='reinRitual') return { term:'superstition', s4:true,
+      txt:'You reinforced no drill, only the idle deck ritual. A reward that follows the wrong action <b>builds that action ▲</b> while the drill you wanted <b>loses ground ▽</b>.' };
+    return { term:'no behavior to reward', s4:true,
+      txt:'The crew kept to the deck, so there was no drill to reinforce. The ration is saved, and the fleet fished.' };
+  }
+  // SEASON 3: two lights, a discrimination trial
+  if(isDecoy){
+    const dm=Math.abs(dVMinus||0), Ad=d=>d.repeat(dm>=6?3:dm>=2?2:1);
+    if(kind==='decoyClear') return { term:'discrimination training', s3:true,
+      txt:'Sefu’s lantern <b>(CS-)</b> stood alone and no storm came. An unconfirmed look-alike <b>loses its hold '+Ad('▽')+'</b>, and the crew learns to tell it from your lamp.' };
+    if(kind==='coFa'||kind==='hit') return { term:'the two lights blur', s3:true,
+      txt:'Both lights burned, so the crew could not tell which the weather answered. What they learn sticks to <b>both</b>, and Sefu’s useless light keeps its hold.' };
+    if(kind==='miss') return { term:'the danger, unsignaled', s3:true,
+      txt:'The storm <b>(US)</b> came with your lamp dark. The lamp’s credit as a warning <b>slips '+A('▽')+'</b>.' };
+  }
+  if(kind==='hit') return { term:'acquisition',
+    txt:'A pairing: the lamp <b>(CS)</b> came just before the storm <b>(US)</b>. The crew’s bond to the lamp <b>strengthens '+A('▲')+'</b>.' };
+  if(kind==='fa') return { term:s2?'extinction':'an unpaired signal',
+    txt:'The lamp <b>(CS)</b> burned with no storm behind it. A signal that keeps coming up empty <b>loses its hold '+A('▽')+'</b>.' };
+  if(kind==='miss') return { term:'the danger, unsignaled',
+    txt:'The storm <b>(US)</b> came with no lamp before it. The lamp’s credit as a warning <b>slips '+A('▽')+'</b>.' };
+  if(s2 && m>=0.5) return { term:'extinction',
+    txt:'No storm came to confirm the lamp. Left unused, the crew’s bond to it quietly <b>fades '+A('▽')+'</b>.' };
+  return { term:'no trial tonight',
+    txt:'The lamp stayed dark, so there was no signal to learn from. The crew simply fished.' };
+}
+/* one-shot educational insights, in plain language, at the moment each first happens */
+function readInsight(kind, heedNow){
+  const I=G.insights, L=G.lev;
+  if(L.id===4){
+    if(kind==='reinDrill' && !I.effect){ I.effect=1;
+      return 'You rewarded a drill the crew ran on their own, and it will grow stronger for it. A behavior followed by something the doer values is repeated more often, which Thorndike called <b>the law of effect</b>.'; }
+    if(kind==='reinRitual' && !I.super){ I.super=1;
+      return 'You gave a ration on a night the crew only stood around the deck. A reward that follows no real effort builds the idle habit instead, the kind of accidental ritual Skinner watched pigeons form when fed on a timer.'; }
+    if(kind==='holdDrill' && !I.opext){ I.opext=1;
+      return 'They ran the drill and you gave nothing, so it will fade a little. A behavior that stops paying off weakens, which is <b>extinction</b> again, now on an action rather than a signal.'; }
+    return null;
+  }
+  if(L.id===3){
+    if(kind==='decoyClear' && G.decoyMoored>=4 && !I.gen){ I.gen=1;
+      return 'They moored for Sefu’s lantern too. Because it looks like your lamp, the meaning of your lamp has spread to it, and psychologists call that spreading <b>generalization</b>.'; }
+    if((kind==='hit'||kind==='coFa') && !I.colit){ I.colit=1;
+      return 'Both lights burned at once, so the crew could not tell which one the weather answered. What they learn tonight sticks to both, and blurring the two keeps them from learning the difference.'; }
+    if(kind==='decoyClear' && G.vMinus < L.heedThreshold && G.decoyMoored<=3 && !I.disc){ I.disc=1;
+      return 'Fewer stood in for Sefu’s light this time. They are learning to hold for your lamp and let his burn unheeded. Telling the two apart like this is <b>discrimination</b>.'; }
+  }
+  if(L.decay && G.inQuiet && G.trust < L.startTrust-6 && !I.fade){ I.fade=1;
+    return 'It has been a long run of calm, with no storm to prove the lamp right. Fewer moor each time you light it, and what you taught them last season is wearing thin.'; }
+  if(kind==='hit' && heedNow && !I.heed){ I.heed=1;
+    return 'For the first time, most of the crew made the harbor fast on your word, before the first wave. The lamp has come to stand for a storm in their minds, and that learned response is the thing you have been building all along.'; }
+  if(kind==='hit' && !heedNow && !I.right){ I.right=1;
+    return 'Your lamp was right, and the storm came just as it promised. The crew saw that. Most did not stay in this time, but a warning that keeps coming true is how their belief is built, one night at a time.'; }
+  if(kind==='fa' && G.trust>22 && !I.wolf){ I.wolf=1;
+    return 'You warned them and the night stayed calm. A signal that turns out wrong, often enough, slowly loses its hold on them.'; }
+  return null;
+}
+/* ============================ PRESENTATION BEATS ============================ */
+// state resolves synchronously above; presentation staggers WHAT THE PLAYER SEES:
+// beat 1 the dock answers the lamp, beat 2 the weather answers the night.
+function presentOutcome(){
+  const tok=++beatTok;
+  const o=G.outcome;
+  const showDock = !isOperant(G.lev) && ((o.moored!=null) || (o.decoyMoored!=null));   // operant has no dock-then-weather beat
+  if(TESTMODE || !motionOK || !showDock || G.finale){ finishOutcome(tok); return; }
+  G.beat=1; renderDecision();
+  setTimeout(()=>{ if(tok!==beatTok || state!=='resolved') return; finishOutcome(tok); }, CONFIG.beatMs);
+}
+function finishOutcome(tok){
+  G.beat=2;
+  const o=G.outcome;
+  if(o.storm){ if(!playSnd('cue_storm',0.4)) snd.storm(); if(motionOK && !TESTMODE){ shake=Math.min(1,shake+0.6); spawnRain(); } flashT= o.lostBoat?0.5:0.25; }
+  if(o.kind==='hit'&&o.heedNow) snd.good(); else if(o.lostBoat) snd.bad();
+  renderDecision();
+  // quiet-night auto-advance: only pure calm fishing nights with nothing to read
+  if(!TESTMODE && o.kind==='cr' && !o.insight && !o.lostBoat && !G.isMuster && !o.firstOfKind && !G.finale){
+    const a=++autoTok; document.getElementById('next').classList.add('auto');
+    setTimeout(()=>{ if(a===autoTok && state==='resolved') nextNight(); }, CONFIG.autoMs);
+  }
+}
+/* ============================ SEASON FLOW ============================ */
+function proceed(){ if(state!=='resolved') return;
+  autoTok++; document.getElementById('next').classList.remove('auto');
+  if(G.boats<=0 && !G.finale){ endGame(false,'boats'); return; }
+  if(G.finale){
+    const survived = !G.crewOut && G.boats>0;
+    const fed = G.catch>=G.lev.catchTarget;
+    const readEnough = G.musterRight >= (G.lev.musterNeed||0) && G.dRight >= (G.lev.decoyNeed||0);
+    let reason='win';
+    if(!survived) reason = isOperant(G.lev)? (G.finaleRitualLoss?'superstition':'weak') : (G.finaleDecoyLoss? 'decoy':'deep');
+    else if(!fed) reason='hungry'; else if(!readEnough) reason='misread';
+    endGame(survived && fed && readEnough, reason);
+    return;
+  }
+  // MERCY RULE (classical seasons only): end a mathematically-lost season early rather than grind it out.
+  if(!isOperant(G.lev) && G.night>=5){
+    let t=G.trust; const left=G.lev.deckStorms - G.stormsSpent;
+    for(let i=0;i<left;i++) t += CONFIG.aRight*(100-t);
+    if(t < 45){ endGame(false,'mercy'); return; }
+  }
+  G.night++; rollNight(); state='reading'; renderDecision();
+}
+function nextNight(){ proceed(); }
+function endGame(won,reason){ state = won?'won':'lost'; G.endReason=reason||(won?'win':'boats');
+  (won?snd.good:snd.bad)(); if(!playSnd('foghorn',0.5)) snd.foghorn(); playSnd('page_turn',0.35); renderOverlay(); }
+/* ============================ UI RENDER (DOM) ============================ */
+const $=id=>document.getElementById(id);
+function pct(x){ return Math.round(x)+'%'; }
+function trustCurveSVG(hist, thresh, hist2, labels){
+  const w=460,h=104,padX=8,padT=10,padB=20, n=hist.length; if(n<2) return '';
+  const lab = labels || { primary:'your lamp (CS+)', secondary:'Sefu’s lantern (CS-)', threshold:'they heed above this line' };
+  const X=(i,tot)=> padX + (w-2*padX)*(i/((tot||n)-1));
+  const Y=v=> (h-padB) - (h-padT-padB)*(Math.max(0,Math.min(100,v))/100);
+  const line=(hh,color,cls)=>{ const pts=hh.map((v,i)=>X(i,hh.length).toFixed(1)+','+Y(v).toFixed(1)).join(' ');
+    return '<polyline class="'+(cls||'')+'" points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="2.5" stroke-linejoin="round"/>'; };
+  const ty=Y(thresh).toFixed(1);
+  const dots=hist.map((v,i)=>'<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(v).toFixed(1)+'" r="2.4" fill="#2c5b66"/>').join('');
+  const second = (hist2&&hist2.length>1)? line(hist2,'#c98a2e','curveline') : '';
+  const legend2 = second? '<text x="'+padX+'" y="12" font-size="9.5" fill="#2c5b66" font-family="Nunito" font-weight="800">■ '+lab.primary+'</text><text x="'+(padX+110)+'" y="12" font-size="9.5" fill="#c98a2e" font-family="Nunito" font-weight="800">■ '+lab.secondary+'</text>' : '';
+  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:auto;background:#fbf6e7;border:2px solid var(--edge);border-radius:9px;margin-top:4px" role="img" aria-label="The crew’s belief across the season">'
+    +'<line x1="'+padX+'" y1="'+ty+'" x2="'+(w-padX)+'" y2="'+ty+'" stroke="#c0392b" stroke-dasharray="5 4" stroke-width="1.5"/>'
+    +'<text x="'+(w-padX-2)+'" y="'+(+ty-4)+'" text-anchor="end" font-size="9.5" fill="#a9402f" font-family="Nunito" font-weight="800">'+lab.threshold+'</text>'
+    +second+line(hist,'#2c5b66','curveline')+dots+legend2
+    +'<text x="'+padX+'" y="'+(h-6)+'" font-size="9" fill="#7a7282" font-family="Nunito">first night</text>'
+    +'<text x="'+(w-padX)+'" y="'+(h-6)+'" text-anchor="end" font-size="9" fill="#7a7282" font-family="Nunito">the Deep</text>'
+    +'</svg>';
+}
+function conceptMap(L){
+  if(isOperant(L)) return '<h3>The four parts, named</h3><div class="dmap">'
+    +'<div class="m"><div class="t">Operant behavior</div><b>The drill.</b> Something the crew does on their own, not a reflex you can trigger.</div>'
+    +'<div class="m"><div class="t">Reinforcer</div><b>The ration.</b> A reward that follows the behavior and makes it more likely next time.</div>'
+    +'<div class="m"><div class="t">Contingency</div><b>Reward the drill, not the idle habit.</b> What matters is which action the ration follows.</div>'
+    +'<div class="m"><div class="t">Superstition</div><b>The idle ritual you fed by accident.</b> Reinforce the wrong action and it grows just the same.</div>'
+    +'</div>';
+  if(L.id===3) return '<h3>The four parts, named</h3><div class="dmap">'
+    +'<div class="m"><div class="t">CS+ · the reliable signal</div><b>Your tower lamp.</b> It really does come before storms, so it is worth heeding.</div>'
+    +'<div class="m"><div class="t">CS- · the look-alike</div><b>Sefu’s lantern.</b> It resembles your lamp but never predicts a storm.</div>'
+    +'<div class="m"><div class="t">Generalization</div><b>Mooring for both lights.</b> The response to your lamp spread to anything that looked like it.</div>'
+    +'<div class="m"><div class="t">Discrimination</div><b>Heeding one, ignoring the other.</b> The crew learned to answer only the light that pays off.</div>'
+    +'</div>';
+  const fourth = L.id===2
+    ? { t:'Extinction', b:'The belief fading when the lamp went night after night unconfirmed.' }
+    : { t:'Acquisition', b:'The belief building, night by night, as the lamp kept proving right.' };
+  return '<h3>The four parts, named</h3><div class="dmap">'
+    +'<div class="m"><div class="t">Conditioned stimulus · CS</div><b>Your lamp.</b> A signal that meant nothing to the crew at first.</div>'
+    +'<div class="m"><div class="t">Unconditioned stimulus · US</div><b>The storm.</b> The real danger the lamp came to stand for.</div>'
+    +'<div class="m"><div class="t">Conditioned response · CR</div><b>The crew mooring.</b> Staying ashore on the lamp alone, before any wave.</div>'
+    +'<div class="m"><div class="t">'+fourth.t+'</div><b>'+fourth.b+'</b></div>'
+    +'</div>';
+}
+function nightLogTable(){
+  if(!G.nightLog.length) return '';
+  if(isOperant(G.lev)){
+    const lbl={ reinDrill:'fed the drill', holdDrill:'let it fade', reinRitual:'fed a habit', holdRitual:'saved the ration', hit:'they moved', miss:'the Deep took them' };
+    const orow=e=>'<tr><td>'+e.n+'</td><td>'+(e.moored==='drill'?'ran the drill':'fished the deck')+'</td><td>'+(e.storm?'—':(e.lit?'🥃 reward':'held'))+'</td><td>'+Math.round(e.trust)+'</td><td>'+(lbl[e.kind]||'·')+'</td></tr>';
+    return '<table class="nlog"><tr><th>night</th><th>the crew</th><th>your move</th><th>readiness</th><th>result</th></tr>'+G.nightLog.map(orow).join('')+'</table>';
+  }
+  const rlbl={hit:'right',fa:'cried wolf',miss:'missed',cr:'fished',coFa:'both lit',decoyClear:'stood clear'};
+  const row=e=>'<tr><td>'+e.n+'</td><td>'+(e.sky==null?'·':Math.round(e.sky*100))+'</td><td>'+(e.storm?'⛈':'·')+'</td><td>'+(e.lit?'🔦':'·')+'</td><td>'+(e.moored==null?'·':e.moored+'/7')+'</td><td>'+(rlbl[e.kind]||'·')+'</td></tr>';
+  return '<table class="nlog"><tr><th>night</th><th>glass</th><th>storm</th><th>lamp</th><th>moored</th><th>result</th></tr>'+G.nightLog.map(row).join('')+'</table>';
+}
+function renderDecision(){
+  $('wrap').classList.add('playing');
+  { const bm=$('bMenu'); if(bm) bm.hidden=false; }
+  const L=G.lev, op=isOperant(L);
+  $('legend').innerHTML = op
+    ? '💪 the drill = the crew’s own action <b>(operant behavior)</b> &nbsp;·&nbsp; 🥃 the ration = the reward that follows it <b>(reinforcer)</b>'
+    : L.id===3
+    ? '🔦 your lamp = the reliable signal <b>(CS+)</b> &nbsp;·&nbsp; 🏮 Sefu’s lantern = the look-alike <b>(CS-)</b> &nbsp;·&nbsp; ⚓ crew mooring = the response <b>(CR)</b>'
+    : '🔦 the lamp = the signal <b>(CS)</b> &nbsp;·&nbsp; ⛈ the storm = the danger it warns of <b>(US)</b> &nbsp;·&nbsp; ⚓ the crew mooring = the learned response <b>(CR)</b>';
+  $('sNight').textContent = G.night+' / '+L.nights;
+  $('sBoats').textContent = G.boats>0 ? '⛵'.repeat(G.boats) : '·';
+  $('sSquall').previousElementSibling.textContent = op? 'Rations' : 'Squalls';
+  $('sSquall').textContent = op? (G.rations+' of '+L.rations) : (G.stormsSpent+' / '+L.deckStorms);
+  // catch bar
+  const frac=Math.min(1,G.catch/L.catchTarget);
+  $('cFill').style.width=(frac*100)+'%';
+  $('cNotch').style.left='100%';
+  $('cBar').classList.toggle('done', G.catch>=L.catchTarget);
+  $('cLab').textContent = G.catch>=L.catchTarget? 'the town will eat' : (G.catch+' of '+L.catchTarget);
+  // the Deep's shadow
+  const dc=$('deepchip');
+  if(G.night>=9 && !G.finale){ dc.hidden=false; dc.innerHTML='The water has been wrong at low tide. <b>The Deep comes in '+(L.nights-G.night)+' night'+((L.nights-G.night)===1?'':'s')+'.</b>'; }
+  else if(G.finale){ dc.hidden=false; dc.innerHTML='<b>The night of the Deep.</b>'; }
+  else dc.hidden=true;
+  renderBelief();
+  $('log').innerHTML = G.log.slice(-12).map(k=>{
+    const t={hit:'right',fa:'cried wolf',miss:'missed',cr:'calm',coFa:'both lit',decoyClear:'stood clear',reinDrill:'rewarded',holdDrill:'held',reinRitual:'mis-rewarded',holdRitual:'saved'}[k]||'·';
+    const cls={coFa:'fa',decoyClear:'cr',reinDrill:'hit',holdDrill:'miss',reinRitual:'fa',holdRitual:'cr'}[k]||k;
+    return '<span class="chip '+cls+'">'+t+'</span>';
+  }).join('');
+  const choiceRow=$('choiceRow'), musterRow=$('musterRow'), nextRow=$('nextRow'), cl=$('cueline');
+  if(state==='reading'){
+    nextRow.hidden=true; $('insight').hidden=true; $('fieldnote').hidden=true; $('btnWave').hidden=false;
+    if(op){
+      $('sky').hidden=true;
+      if(G.finale){
+        musterRow.hidden=false; choiceRow.hidden=true; $('btnWave').hidden=true;
+        $('btnRing').innerHTML='Face the Deep<span class="sub">the drill is theirs now, or it is not</span>'; $('btnRing').disabled=false;
+        cl.innerHTML='<b>The lowest tide of the year. The water has gone wrong, and there is no time left to give an order.</b><br>Whatever the crew have learned to do on their own is all that stands between them and the Deep.';
+        announce('The night of the Deep. Face it.'); return;
+      }
+      if(G.isMuster && !G.musterAnswered){
+        musterRow.hidden=false; choiceRow.hidden=true;
+        $('btnRing').innerHTML='They will drill<span class="sub">the habit is theirs</span>';
+        $('btnWave').innerHTML='They will not<span class="sub">they must be told</span>';
+        if(!TESTMODE){ $('btnRing').disabled=true; $('btnWave').disabled=true; const tok=++beatTok; setTimeout(()=>{ if(tok===beatTok&&state==='reading'){ $('btnRing').disabled=false; $('btnWave').disabled=false; } }, CONFIG.bellMs); }
+        else { $('btnRing').disabled=false; $('btnWave').disabled=false; }
+        cl.innerHTML='<div style="text-align:center"><img src="assets/portrait_marisol.webp" alt="Marisol, the harbormaster" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--lampDk);box-shadow:0 2px 10px rgba(0,0,0,.45);margin-bottom:6px" onerror="this.style.display=\'none\'"><div>The harbormaster wants your read before the crew turns out. <b>Will they run the drill on their own tonight, or must they be told?</b> Go by the readiness you have built.</div></div>';
+        announce('A muster. Will the crew run the drill unbidden tonight?'); return;
+      }
+      // the emission is shown; reward it or bank the ration
+      musterRow.hidden=true; choiceRow.hidden=false;
+      const noR=G.rations<=0;
+      $('btnLight').innerHTML='Reward the drill<span class="sub">'+(noR?'no rations left':'spend a ration')+'</span>'; $('btnLight').disabled=noR;
+      $('btnDark').innerHTML='Hold the ration<span class="sub">save it</span>'; $('btnDark').disabled=false;
+      const banner=G.drilled
+        ? '<span style="color:#8fd3ab">The crew ran the storm drill on their own, the boats up the ramp and hands on the sea-wall.</span>'
+        : '<span style="color:#d3ab72">The crew did not drill tonight. They kept to the deck, mending and idling.</span>';
+      cl.innerHTML='Night '+G.night+'. '+banner+' <b>'+(G.drilled?'Reward it, or bank the ration?':'There is nothing worth rewarding here.')+'</b>'
+        + (G.night===1? ' <span style="color:#9fd8b0">This season the crew act first. Spend a ration on the nights they actually drill, and the drill grows into a habit.</span>':'');
+      announce('Night '+G.night+'. '+(G.drilled?'The crew drilled. Reward it, or hold the ration?':'The crew kept to the deck. Reward, or hold the ration?')); return;
+    }
+    if(G.isMuster && !G.musterAnswered){
+      musterRow.hidden=false; choiceRow.hidden=true; $('sky').hidden=true;
+      const askDecoy = (G.isDecoy && !G.finale && G.musterPhase===1);
+      const M='assets/portrait_marisol.webp';
+      const face='<img src="'+M+'" alt="Marisol, the harbormaster" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--lampDk);box-shadow:0 2px 10px rgba(0,0,0,.45);margin-bottom:6px" onerror="this.style.display=\'none\'">';
+      if(G.finale){
+        $('btnRing').innerHTML='Ring the bell<span class="sub">trust them to stay in</span>';
+        $('btnWave').innerHTML='Wave them out<span class="sub">send them to fish</span>';
+      } else if(askDecoy){
+        $('btnRing').innerHTML='They will heed it<span class="sub">Sefu’s light holds them too</span>';
+        $('btnWave').innerHTML='They will not<span class="sub">they ignore Sefu’s light</span>';
+      } else {
+        $('btnRing').innerHTML='They will heed<span class="sub">the lamp holds them in</span>';
+        $('btnWave').innerHTML='They will not<span class="sub">they sail out anyway</span>';
+      }
+      if(!TESTMODE && G.musterPhase===0){ $('btnRing').disabled=true; $('btnWave').disabled=true;
+        const tok=++beatTok; setTimeout(()=>{ if(tok===beatTok && state==='reading'){ $('btnRing').disabled=false; $('btnWave').disabled=false; } }, CONFIG.bellMs); }
+      else { $('btnRing').disabled=false; $('btnWave').disabled=false; }
+      cl.innerHTML = G.finale
+        ? '<b>The lowest tide of the year. The water has gone wrong, and the glass shows nothing.</b><br>Tonight there is nothing to read but the season behind you'+(G.isDecoy?', and whether the crew can still tell your lamp from Sefu’s':'')+'. Ring the bell to call them in, or wave the fleet out.'
+        : askDecoy
+          ? '<div style="text-align:center">'+face+'<div>And Sefu’s lantern. <b>If only that burned tonight, would the crew turn for it too?</b> Go by what the dock has shown you, not by what you hope they have learned.</div></div>'
+          : '<div style="text-align:center">'+face+'<div>'+(G.isDecoy?'The harbormaster wants two reads before the night turns. First, the tower lamp: ':'The harbormaster wants your read before the night turns. ')+'<b>If the lamp burned tonight, would the crew heed it and stay in?</b> Read the belief you have built.</div></div>';
+      announce(G.finale?'The night of the Deep. Ring the bell, or wave the fleet out?': askDecoy?'And Sefu’s lantern. Would the crew turn for that too?':'A muster. Would the crew heed a lit lamp tonight?');
+    } else {
+      musterRow.hidden=true; choiceRow.hidden=false; $('btnLight').disabled=false; $('btnDark').disabled=false;
+      $('sky').hidden=false; $('skyNeedle').style.left=Math.round(G.sky*100)+'%';
+      if(G.isDecoy){
+        $('btnLight').innerHTML='Light your lamp too<span class="sub">both lights burn</span>';
+        $('btnDark').innerHTML='Keep the tower dark<span class="sub">let Sefu’s light stand alone</span>';
+      } else {
+        $('btnLight').innerHTML='Light the lamp<span class="sub">warn them to stay in</span>';
+        $('btnDark').innerHTML='Leave it dark<span class="sub">let them fish</span>';
+      }
+      cl.innerHTML = 'Night '+G.night+'. '+G.skyLine+' <b>'+skyOdds(G.sky)+'</b>.'
+        + (G.isDecoy ? ' <span style="color:#e0b978">Down on the dock, Sefu’s lantern is lit.</span>' : '')
+        + (G.night===1 ? ' <span style="color:#9fd8b0">The bar above is tonight’s reading: the further toward STORM, the likelier a storm. Light the lamp to call the crew in, or leave it dark and let them fish.</span>' : '')
+        + (G.isMuster && G.musterAnswered && !G.isDecoy ? '<div class="bark"><img src="assets/portrait_marisol.webp" alt="" onerror="this.style.display=\'none\'"><span>'+gossipLine()+'</span></div>' : '')
+        + (G.inQuiet ? ' <span style="color:var(--warn)">The calm holds.</span>' : '');
+      announce('Night '+G.night+'. '+G.skyLine+' '+skyOdds(G.sky)+(G.isDecoy?'. Sefu’s lantern is lit. Light your lamp too, or keep the tower dark?':'. Light the lamp, or leave it dark?'));
+    }
+  } else if(state==='resolved'){
+    musterRow.hidden=true; choiceRow.hidden=true; $('sky').hidden=true;
+    const o=G.outcome;
+    if(G.beat===1){
+      nextRow.hidden=true; $('fieldnote').hidden=true;
+      cl.innerHTML='<b>The dock answers first.</b> '+(o.moored!=null? '<b>'+o.moored+' of the seven</b> crews moor under your light (the conditioned response). The rest slip past it.'
+        : o.decoyMoored!=null? '<b>'+o.decoyMoored+' of the seven</b> crews turn for Sefu’s lantern. The rest read the sky for themselves.' : '');
+      return;
+    }
+    nextRow.hidden=false;
+    // the psychology lens: name the trial in the field's terms
+    const fn=$('fieldnote');
+    if(o.concept && !G.finale){ fn.hidden=false; fn.classList.toggle('s3', !!(o.concept.s3||o.concept.s4)); fn.innerHTML='<span class="pill">'+o.concept.term+'</span><span class="lens">the psychology</span><span class="txt">'+o.concept.txt+'</span>'; }
+    else fn.hidden=true;
+    let extra='';
+    if(o.lostBoat && !G.finale) extra=' A boat is lost.';
+    else if(o.earned) extra=' +'+o.earned+' catch.';
+    let mnote='';
+    if(G.lastMuster){ const lm=G.lastMuster;
+      let lampMsg;
+      if(op){ lampMsg = lm.lampRight? 'You read the drill right.' : (lm.lampCall? 'You called they would drill, but the habit is not there yet.' : 'You called they would not, but the drill is stronger than you thought.'); }
+      else lampMsg = lm.lampRight ? 'You read the lamp right.' : (lm.lampCall? 'You called they would heed the lamp, and the season says otherwise.' : 'You called they would not, but their belief has come further than you thought.');
+      let decoyMsg='';
+      if(lm.decoyCall!=null){ decoyMsg = lm.decoyRight ? ' You read Sefu’s light right too.'
+        : (lm.decoyCall? ' But they have learned to ignore Sefu’s lantern more than you thought.' : ' But they still turn for Sefu’s lantern more than you thought.'); }
+      const allRight = lm.lampRight && (lm.decoyCall==null || lm.decoyRight);
+      mnote = ' <span style="color:'+(allRight?'var(--good)':'var(--bad)')+'">'+lampMsg+decoyMsg+'</span>'; }
+    let barkHtml='';
+    if(o.bark) barkHtml='<div class="bark"><img src="assets/portrait_odell.webp" alt="Odell" onerror="this.style.display=\'none\'"><span>'+o.bark+'</span></div>';
+    cl.innerHTML = (o.head?'<b>'+o.head+'</b> ':'')+o.body+extra+mnote+barkHtml;
+    const ins=$('insight');
+    if(o.insight){ ins.hidden=false; ins.innerHTML='<span class="lab">From the keeper’s log</span><span class="txt">'+o.insight+'</span>'; }
+    else ins.hidden=true;
+    $('next').innerHTML = ((G.finale||G.boats<=0)? 'See how the season ends':'Next night')+'<span class="ring"></span>';
+    announce((o.head||'')+' '+o.body+extra);
+  }
+}
+function renderBelief(){
+  const L=G.lev, thr=L.heedThreshold;
+  if(isOperant(L)){
+    $('bLab').textContent='Drill readiness (the behavior)';
+    $('bFill').style.width=G.readiness+'%'; $('bHeed').style.left=thr+'%';
+    $('bNote').textContent = G.drilled==null? '' : (G.drilled? 'last night: they drilled' : 'last night: kept to the deck');
+    const r2=$('bRow2'); r2.hidden=false; $('bFill2').style.width=G.ritual+'%'; $('bHeed2').style.left=thr+'%';
+    r2.querySelector('.blab').textContent='The idle ritual (a useless habit)';
+    $('bNote2').textContent='';
+    $('bHint').innerHTML = G.readiness>=thr
+      ? (G.ritual>=G.readiness? 'The idle ritual has overtaken the drill. Stop rewarding the deck nights.' : 'The drill is a habit now. They will run it when the Deep comes.')
+      : 'Not yet a habit. Reward the nights they actually drill to build it.';
+    return;
+  }
+  $('bLab').textContent = L.id===3? 'Their belief in your lamp (CS+)' : 'The crew’s belief in your lamp';
+  $('bFill').style.width=G.trust+'%';
+  $('bHeed').style.left=thr+'%';
+  const lm=G.mooredHistory.length? G.mooredHistory[G.mooredHistory.length-1] : null;
+  $('bNote').textContent = lm!=null? ('last lit night: '+lm+'/7 moored') : '';
+  const r2=$('bRow2');
+  if(L.id===3){ r2.hidden=false; $('bFill2').style.width=G.vMinus+'%'; $('bHeed2').style.left=thr+'%';
+    r2.querySelector('.blab').textContent='Their belief in Sefu’s lantern';
+    const ld=G.decoyMooredHistory.length? G.decoyMooredHistory[G.decoyMooredHistory.length-1] : null;
+    $('bNote2').textContent = ld!=null? ('stood alone: '+ld+'/7 turned') : '';
+    $('bHint').innerHTML = G.vMinus>=thr
+      ? 'The two lights are still blurred. Keep your tower dark on Sefu’s nights so his light loses its hold.'
+      : 'They can tell your lamp from Sefu’s now. Hold that apart through the Deep.';
+  } else { r2.hidden=true;
+    $('bHint').innerHTML = G.trust>=thr
+      ? 'They believe the lamp enough to heed it on the night the Deep comes, with no storm to see.'
+      : (L.decay? 'Below the line and slipping. Spend the rare storms to build it back.' : 'Below the line. Warn them truly and reliably, and it will build.');
+  }
+}
+function startLevel(){ audioOn(); theme(false); newGame(levelIdx); state='reading'; overlayWrap.hidden=true; showBgVideo(false); renderDecision(); canvas.focus({preventScroll:true}); }
+/* ============================ OVERLAYS ============================ */
+function renderOverlay(){
+  $('wrap').classList.remove('playing');
+  { const bm=$('bMenu'); if(bm) bm.hidden=true; }
+  overlayWrap.hidden = !(state==='title'||state==='menu'||state==='won'||state==='lost');
+  overlayWrap.classList.toggle('titlescreen', state==='title');
+  showBgVideo(state==='title','menu_loop');
+  theme(state==='title'||state==='menu');
+  const L=LEVELS[levelIdx];
+  if(state==='title'){
+    overlay.style.cssText='background:transparent;border:none;box-shadow:none;padding:0;max-height:none;overflow:visible';
+    overlay.innerHTML = `<div class="titlecard">
+      <h1 class="wm">Signal &amp; Noise</h1>
+      <div class="sub">The Keeper</div>
+      <div class="rule"></div>
+      <div class="hook">
+        <p>The last keeper lit the lamp for every squall until nobody looked up when it burned.</p>
+        <p>The night they stopped believing him, the sea took four boats.</p>
+        <p>The lamp is yours now. What is left of their trust comes with it.</p>
+      </div>
+      <button class="bigbtn" id="bBegin" type="button">Take the post</button></div>`;
+    $('bBegin').onclick=()=>{ audioOn(); theme(true); overlay.style.cssText=''; state='menu'; renderOverlay(); };
+    return;
+  }
+  overlay.style.cssText='';
+  if(state==='menu'){
+    const opMenu = isOperant(L);
+    const facts = opMenu
+      ? `<span class="k">🥃 ${L.rations} rations to spend</span><span class="k">🐟 land ${L.catchTarget} catch</span><span class="k">🔔 read the crew at ${ (L.musterNights||[]).length } musters</span><span class="k">night ${L.nights}: the Deep, no warning</span>`
+      : `<span class="k">⛈ ${L.deckStorms} squalls dealt</span><span class="k">🐟 land ${L.catchTarget} catch</span><span class="k">🔔 read the crew at ${ (L.musterNights||[]).length } musters</span><span class="k">night ${L.nights}: the Deep</span>`;
+    const story = L.story? `<div class="story"><div class="stitle">The real experiment · ${L.story.era}</div><p>${L.story.body}</p><p class="tie"><b>In this season:</b> ${L.story.tie}</p><a href="${L.story.url}" target="_blank" rel="noopener">Read about it ↗</a></div>` : '';
+    overlay.innerHTML = `<div style="text-align:center;margin:-2px 0 10px"><div style="font-family:'Cinzel',serif;font-weight:700;font-size:24px;letter-spacing:1.5px;color:#9a7b2e">Signal &amp; Noise</div><div class="small" style="text-transform:uppercase;letter-spacing:.6px;font-weight:800;color:#2c5b66">Season ${L.id} of ${LEVELS.length} &nbsp;·&nbsp; ${L.term}</div></div>
+      <h1>${L.name}</h1>
+      ${story}
+      <div style="background:#fff7e2;border:2px solid var(--lampDk);border-radius:10px;padding:9px 13px;margin:0 0 12px;font-size:14.5px;color:#473d4a"><b>This season:</b> ${L.objective}</div>
+      <p class="prose">${L.intro}</p>
+      <p class="prose" style="color:#6a5a2e">${L.almanac}</p>
+      <div class="kfacts">${facts}</div>
+      <p class="small">${opMenu
+        ? 'Reward the drill <b>(L)</b> or hold the ration <b>(D)</b>. At a muster, predict they will drill unbidden <b>(R)</b> or they will not <b>(W)</b>. <b>Space</b> moves on.'
+        : 'Light the lamp <b>(L)</b> or leave it dark <b>(D)</b>. At a muster, they will heed <b>(R)</b> or they will not <b>(W)</b>. <b>Space</b> moves on.'}</p>
+      <div style="margin-top:4px">
+        <button class="btn" id="bStart" type="button">${L.id===1?'Light the first night':'Begin the season'}</button>
+        ${levelIdx>0?'<button class="btn" id="bPrev" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">◀ Earlier season</button>':''}
+        ${levelIdx<LEVELS.length-1?'<button class="btn" id="bFwd" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">Later season ▶</button>':''}
+      </div>
+      <p class="small" style="margin-top:10px;color:#7a7282">Every season stands on its own, so you can jump to any of the four from here.${maxUnlocked>0?' &nbsp;·&nbsp; <a href="#" id="bReset" style="color:#9a6a4a">Reset progress</a>':''}</p>`;
+    $('bStart').onclick=startLevel;
+    if($('bPrev')) $('bPrev').onclick=()=>{ levelIdx=Math.max(0,levelIdx-1); renderOverlay(); };
+    if($('bFwd')) $('bFwd').onclick=()=>{ levelIdx=Math.min(LEVELS.length-1,levelIdx+1); renderOverlay(); };
+    if($('bReset')) $('bReset').onclick=(e)=>{ e.preventDefault(); maxUnlocked=0; try{localStorage.removeItem('keeperMax');}catch(_){} levelIdx=0; renderOverlay(); };
+    return;
+  }
+  const s=G.stats, won=state==='won', why=G.endReason||'boats';
+  const opv=isOperant(L);
+  const titles={ win:'The fleet came home', boats:'The harbor is empty', deep:'The Deep took them', hungry:'A hungry winter', misread:'You never knew the crew', mercy:'The season turns without you', decoy:'They followed the wrong light', weak:'They stood frozen at the rail', superstition:'A ritual that saved no one' };
+  const missed=G.stats.miss;
+  const leads={
+    win:'You brought the crew through to the lowest tide, and when the Deep rose they trusted the lamp enough to stay ashore, and they had fished the calm nights well enough to see the town through the winter.',
+    boats:'You ran out of boats before the season turned. Too many nights the crew was caught out on the water.',
+    deep:'You reached the last night, but the crew had not learned to believe the lamp in time, and when the Deep rose they were out on the water. A warning is only ever worth the belief behind it.',
+    hungry:'You kept the boats safe, but the crew spent too many good nights ashore, and the town went into winter without enough catch. Warning on a calm night costs you even when no one drowns.',
+    misread:'You survived the Deep and fed the town, but too many times the harbormaster called a muster and you misjudged the crew. They could not put the fleet in the hands of a keeper who could not read them.',
+    mercy:'Marisol comes up the tower stairs and does not sit. "'+missed+' of the '+G.lev.deckStorms+' squalls passed a dark lamp. There is not enough season left for the crew to learn you."',
+    decoy:'You survived the storm and fed the town, but when the Deep rose half the fleet rowed for Sefu’s lantern down the shore, still unable to tell his light from your warning. You never taught them the difference in time.',
+    weak:'The Deep rose with no warning, and the crew stood frozen at the rail. The drill never became a habit they would run on their own, and they did not move in time.',
+    superstition:'The Deep rose, and the crew fell to the same idle habit you kept rewarding, a ritual that held back nothing. You built the wrong behavior, and the water took them.' };
+  const statline = opv
+    ? `<div class="kfacts"><span class="k">drill readiness: ${Math.round(G.readiness)}</span><span class="k">idle ritual: ${Math.round(G.ritual)}</span><span class="k">rations left: ${G.rations}</span><span class="k">reads: ${G.musterRight}/${G.musterCount}</span></div>`
+    : L.id===3
+    ? `<div class="kfacts"><span class="k">lamp reads: ${G.musterRight-G.dRight}/${G.musterCount-G.dCount}</span><span class="k">Sefu reads: ${G.dRight}/${G.dCount}</span><span class="k">storms missed: ${s.miss}</span></div>`
+    : `<div class="kfacts"><span class="k">lamp right: ${s.hit}</span><span class="k">cried wolf: ${s.fa}</span><span class="k">storms missed: ${s.miss}</span><span class="k">crew read: ${G.musterRight}/${G.musterCount}</span></div>`;
+  const mirror = opv
+    ? `<p class="small">You read the drill right on <b>${G.musterRight} of ${G.musterCount}</b> musters, spent <b>${(L.rations-G.rations)} of ${L.rations}</b> rations, and landed <b>${G.catch}</b> of ${L.catchTarget} catch.</p>`
+    : `<p class="small">You read the crew right on <b>${G.musterRight} of ${G.musterCount}</b> muster calls, and landed <b>${G.catch}</b> fish against a mark of ${L.catchTarget}, with <b>${G.boats}</b> boat${G.boats===1?'':'s'} left.</p>`;
+  const cap = opv
+    ? 'The dark line is the drill readiness you built, the amber is the idle ritual. Each reward that followed a real drill lifted the dark line; the rations you spent on deck nights lifted the amber instead.'
+    : L.id===3
+    ? 'The blue line is the crew’s belief in your lamp; the amber is their belief in Sefu’s lantern. They start together, because at first a light was just a light. Watch the amber sink as you let his light stand alone, until the crew could tell the two apart.'
+    : (!won
+      ? 'This is the belief you watched build all season, the whole arc in one line. It never climbed high enough, or held, for the crew to trust the lamp on the night it counted.'
+      : (L.decay
+        ? 'This is the belief you watched all season, the whole arc in one line. See it sag through the long calm, when no storm came to prove the lamp right, then climb back as you spent the rare storms to remind them.'
+        : 'This is the belief you watched build all season, the whole arc in one line. Every night the lamp proved right, it climbed, until they would heed it on a night with no storm in sight.'));
+  const curveLabels = opv
+    ? { primary:'drill readiness (the behavior)', secondary:'the idle ritual', threshold:'a self-started drill above this line' }
+    : (L.id===3 ? { primary:'your lamp (CS+)', secondary:'Sefu’s lantern (CS-)', threshold:'they heed above this line' } : null);
+  const curve = `${trustCurveSVG(G.trustHistory, L.heedThreshold, opv?G.ritualHistory:(L.id===3?G.vMinusHistory:null), curveLabels)}<p class="small">${cap}</p>`;
+  const lossLead = opv
+    ? 'What you were building, and ran short of, is a drill the crew would run on their own. '
+    : 'What you were building, and ran short of, is the crew’s learned trust in the lamp. ';
+  if(!won){
+    overlay.innerHTML = `<h2>${titles[why]}</h2><p class="prose">${leads[why]}</p>
+      <h3>What you were building</h3>
+      ${curve}
+      <p class="prose">${lossLead}${L.debrief.body}</p>
+      ${conceptMap(L)}
+      <h3>The season, night by night</h3>
+      ${nightLogTable()}
+      ${statline}${mirror}
+      <button class="btn" id="bRetry" type="button">Take the season again</button>
+      <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">⚓ Back to the harbor</button>`;
+    $('bRetry').onclick=startLevel;
+    if($('bHarbor')) $('bHarbor').onclick=()=>{ state='menu'; renderOverlay(); };
+    return;
+  }
+  maxUnlocked=Math.max(maxUnlocked, Math.min(levelIdx+1, LEVELS.length-1)); saveProgress();
+  const hasNext = levelIdx+1 < LEVELS.length;
+  const sefu = (L.id===2)? `<p class="prose" style="color:#6a5a2e">A peddler named Sefu has set a lantern stall on the dock. Some nights, from the water, his light looks like yours.</p>` : '';
+  overlay.innerHTML = `<h2>${titles.win}</h2><p class="prose">${leads.win}</p>
+    ${L.back? `<p class="prose" style="color:#6a5a2e">${L.back}</p>`:''}
+    <h3>What you were really doing</h3>
+    <p class="prose">${L.debrief.body}</p>
+    ${curve}
+    ${conceptMap(L)}
+    <p class="prose">${opv
+      ? 'You watched the drill readiness climb as you rewarded the crew for the thing you wanted, and the idle ritual climb on the nights you rewarded them for nothing in particular. A behavior grows when it pays and fades when it stops paying, and the whole season was you deciding, night by night, which behavior to feed.'
+      : 'You watched that belief rise and fall as you conditioned the crew, and you bet on it each time the harbormaster called a muster. In a real study the strength behind a learned response is usually invisible, inferred only from behavior like the mooring on the dock; here you got to watch the very thing that is normally hidden.'}</p>
+    <h3>The season, night by night</h3>
+    ${nightLogTable()}
+    <p class="prose"><b>Carry it off the coast:</b> ${L.debrief.transfer}</p>
+    ${statline}${mirror}
+    <p class="small">Read more: <a href="${L.debrief.url}" target="_blank" rel="noopener">the psychology behind this season</a> (opens in a new tab).</p>
+    ${sefu}
+    ${hasNext
+      ? `<button class="btn" id="bNext" type="button">Begin the next season: ${LEVELS[levelIdx+1].name}</button> <button class="btn" id="bAgain" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">Replay this season</button>`
+      : `<button class="btn" id="bAgain" type="button">Take this season again</button>`}
+    <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">⚓ Harbor</button>`;
+  if($('bNext')) $('bNext').onclick=()=>{ levelIdx++; state='menu'; renderOverlay(); };
+  if($('bAgain')) $('bAgain').onclick=startLevel;
+  if($('bHarbor')) $('bHarbor').onclick=()=>{ state='menu'; renderOverlay(); };
+}
+function announce(m){ $('sr').textContent=''; setTimeout(()=>$('sr').textContent=m,40); }
+/* ============================ CANVAS SCENE ============================ */
+function fit(){ const dpr=Math.min(window.devicePixelRatio||1,2); const cw=canvas.clientWidth||W, chh=cw*(H/W); canvas.width=Math.round(cw*dpr); canvas.height=Math.round(chh*dpr); ctx.setTransform(canvas.width/W,0,0,canvas.height/H,0,0); }
+addEventListener('resize',fit);
+function spawnRain(){ for(let i=0;i<40;i++) rain.push({x:rng()*W,y:-rng()*120,vy:520+rng()*240,len:9+rng()*9}); }
+function drawCover(img){ const sc=1.12; ctx.drawImage(img,0,0,W*sc,H*sc); }
+// the four crew silhouettes in crew.webp, as approximate source rects
+const CREWSRC=[[0,0,235,470],[262,0,195,470],[510,0,300,470],[840,0,260,470]];
+function drawCrewFigure(i,x,y,h){
+  const img=IMG.crew;
+  if(img){ const s=CREWSRC[i%4]; const w=h*(s[2]/s[3]); ctx.drawImage(img,s[0],s[1],s[2],s[3],x-w/2,y-h,w,h); return; }
+  ctx.fillStyle='#1d2735'; ctx.fillRect(x-3,y-h*0.6,6,h*0.6); ctx.beginPath(); ctx.arc(x,y-h*0.72,h*0.14,0,7); ctx.fill();
+}
+function drawAmbient(){
+  ctx.clearRect(0,0,W,H);
+  const calmBg = IMG.bg_starlit||IMG.bg_dusk;
+  if(calmBg) drawCover(calmBg);
+  else { const g=ctx.createLinearGradient(0,0,0,H*0.7); g.addColorStop(0,'#0c1330'); g.addColorStop(1,'#1a2746'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    const sg=ctx.createLinearGradient(0,H*0.7,0,H); sg.addColorStop(0,'#26395a'); sg.addColorStop(1,'#16202f'); ctx.fillStyle=sg; ctx.fillRect(0,H*0.7,W,H*0.3); }
+  const lampX = calmBg? W*0.42 : W*0.80, lampY = calmBg? H*0.27 : H*0.45;
+  const sweep = motionOK? Math.sin(animTime*0.55)*0.5 : 0;
+  ctx.save(); ctx.globalAlpha=0.13; ctx.fillStyle='#ffe39a'; ctx.beginPath(); ctx.moveTo(lampX,lampY); ctx.lineTo(W*1.05,lampY-130+sweep*230); ctx.lineTo(W*1.05,lampY+80+sweep*230); ctx.closePath(); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.shadowColor='#f5c14e'; ctx.shadowBlur=28; ctx.fillStyle='#f5c14e'; ctx.beginPath(); ctx.arc(lampX,lampY,9,0,7); ctx.fill(); ctx.restore();
+  for(let i=0;i<3;i++){ const bob=motionOK? Math.sin(animTime*1.6+i)*3:0; drawBoat(W*0.09+i*42, H*0.83+bob, 22); }
+}
+function drawScene(){
+  if(state==='title'){ if(bgVideoLive()){ ctx.clearRect(0,0,W,H); } else drawAmbient(); return; }
+  if(state==='menu'){ ctx.clearRect(0,0,W,H); if(IMG.coast_map){ drawCover(IMG.coast_map); ctx.fillStyle='rgba(10,16,28,.25)'; ctx.fillRect(0,0,W,H); } else drawAmbient(); return; }
+  if(state==='won'||state==='lost'){ ctx.clearRect(0,0,W,H);
+    if(IMG.lighthouse_interior){ drawCover(IMG.lighthouse_interior); ctx.fillStyle='rgba(10,14,24,.25)'; ctx.fillRect(0,0,W,H); }
+    else if(state==='won' && IMG.bg_dawn) drawCover(IMG.bg_dawn);
+    else drawAmbient();
+    return; }
+  ctx.clearRect(0,0,W,H);
+  const storm = (state==='resolved' && G && G.outcome && G.outcome.storm && G.beat===2);
+  const finaleVideo = G && G.finale && bgVideoLive();
+  const calmBg = IMG.bg_starlit||IMG.bg_dusk;
+  if(finaleVideo){ ctx.fillStyle='rgba(8,12,22,0.25)'; ctx.fillRect(0,0,W,H); }   // scrim over the rising Deep, capped
+  else if(state==='won' && IMG.bg_dawn) drawCover(IMG.bg_dawn);
+  else if(storm && IMG.bg_storm) drawCover(IMG.bg_storm);
+  else if(G && G.finale && IMG.bg_storm) drawCover(IMG.bg_storm);
+  else if(calmBg) drawCover(calmBg);
+  else {
+    const g=ctx.createLinearGradient(0,0,0,H*0.7); if(storm){ g.addColorStop(0,'#2a3142'); g.addColorStop(1,'#454d5b'); } else { g.addColorStop(0,'#0c1330'); g.addColorStop(1,'#1a2746'); }
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    if(!storm){ for(let i=0;i<60;i++){ const x=(i*137)%W,y=14+(i*61)%200; ctx.globalAlpha=0.4+0.4*Math.sin(i+animTime*0.7); ctx.fillStyle='#cfe0f5'; ctx.fillRect(x,y,2,2);} ctx.globalAlpha=1; }
+    ctx.fillStyle='#39465f'; ctx.beginPath(); ctx.moveTo(W*0.80-70,H*0.70+8); ctx.quadraticCurveTo(W*0.80,H*0.70-14,W*0.80+70,H*0.70+8); ctx.lineTo(W*0.80+70,H); ctx.lineTo(W*0.80-70,H); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#efe7d2'; ctx.beginPath(); ctx.moveTo(W*0.80-18,H*0.70-4); ctx.lineTo(W*0.80-12,H*0.70-104); ctx.lineTo(W*0.80+12,H*0.70-104); ctx.lineTo(W*0.80+18,H*0.70-4); ctx.closePath(); ctx.fill();
+    const sg=ctx.createLinearGradient(0,H*0.7,0,H); sg.addColorStop(0,'#26395a'); sg.addColorStop(1,'#16202f'); ctx.fillStyle=sg; ctx.fillRect(0,H*0.7,W,H*0.3);
+  }
+  // lamp
+  const lampOn = G && G.decided && G.lit;
+  const lampX = calmBg? W*0.42 : W*0.80, lampY = calmBg? H*0.27 : H*0.70-118;
+  if(lampOn){
+    const sweep=motionOK?Math.sin(animTime*1.2)*0.12:0;
+    ctx.save(); ctx.globalAlpha=0.14; ctx.fillStyle='#ffe39a'; ctx.beginPath(); ctx.moveTo(lampX,lampY); ctx.lineTo(W*1.02,lampY-95+sweep*180); ctx.lineTo(W*1.02,lampY+55+sweep*180); ctx.closePath(); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.shadowColor='#f5c14e'; ctx.shadowBlur=30; ctx.fillStyle='#f5c14e'; ctx.beginPath(); ctx.arc(lampX,lampY,11,0,7); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.globalAlpha=0.16; ctx.fillStyle='#ffe39a'; ctx.beginPath(); ctx.arc(lampX,lampY,44,0,7); ctx.fill(); ctx.restore();
+  } else if(state==='reading'){ ctx.save(); ctx.globalAlpha=0.12; ctx.fillStyle='#0b1228'; ctx.fillRect(0,0,W,H); ctx.restore(); }
+  // the Deep on the finale (static art when the video is not running)
+  if(G && G.finale && G.decided && !finaleVideo && IMG.deep){ const img=IMG.deep, dw=W*0.46, dh=dw*(img.naturalHeight/img.naturalWidth), rise=G.crewOut?1:0.45;
+    ctx.save(); ctx.globalAlpha=0.55*rise+0.25; ctx.drawImage(img, W*0.5-dw/2, H*0.70 - dh*0.42*rise, dw, dh); ctx.restore(); }
+  const opScene = G && isOperant(G.lev);
+  // SEASON 4: the crew EMIT their own behavior. A drill night hauls the boats up the ramp and mans the wall;
+  // a deck night leaves them out fishing. Shown as soon as the emission is revealed, and held through the outcome.
+  if(opScene){
+    const showEmit = (state==='reading' && G.emissionShown && !G.finale) || (state==='resolved');
+    let drillNow;
+    if(G.finale && state==='resolved') drillNow = !!(G.outcome && G.outcome.heedNow);   // survived == moved == drilled
+    else drillNow = !!G.drilled;
+    const nb = G? G.boats : 0;
+    if(showEmit){
+      for(let i=0;i<nb;i++){
+        const bob = (motionOK && !drillNow)? Math.sin(animTime*2+i)*3:0;
+        if(drillNow){ drawBoat(W*0.44 + i*30, H*0.70 - 2 - i*1.5, 18); }   // hauled up the ramp toward the tower
+        else { drawBoat(W*0.08 + i*40, H*0.88 + bob, 24); }                // out fishing on the deck
+      }
+      const cn=Math.min(nb,CONFIG.crewN);
+      for(let i=0;i<cn;i++){
+        const x = drillNow? (W*0.40 + i*20) : (W*0.12 + i*22);
+        const y = drillNow? H*0.74 : H*0.82;
+        drawCrewFigure(i, x, y, 32);
+      }
+    }
+  } else {
+  // the dock: crews that moored stand by the lamp side; the rest walk to the boats
+  if(G && G.decided && G.moored!=null){
+    const k=G.moored, n=Math.min(G.boats,CONFIG.crewN);
+    for(let i=0;i<n;i++){
+      const moor=i<k;
+      const t=motionOK? Math.min(1,(animTime%1000)):1;
+      const x= moor? W*0.30+i*20 : W*0.10+i*22;
+      const y= H*0.815;
+      drawCrewFigure(i, x, y, 34);
+    }
+  }
+  // boats: out on the water if the crew sailed, else moored at the dock
+  const out = G && G.decided && G.crewOut;
+  const n = G? G.boats : 0;
+  for(let i=0;i<n;i++){
+    const bob = motionOK? Math.sin(animTime*2+i)*3:0;
+    let x,y;
+    if(out){ x = W*0.10 + i*46; y = H*0.88 + bob; }
+    else { x = W*0.06 + i*30; y = H*0.90 + bob*0.4; }
+    drawBoat(x,y, out? 26:20);
+  }
+  }
+  if(G && G.decided && G.outcome && G.outcome.lostBoat && G.beat===2 && motionOK){
+    ctx.save(); ctx.globalAlpha=0.6; ctx.fillStyle='#0c1820'; ctx.beginPath(); ctx.ellipse(W*0.5,H*0.86,40,10,0,0,7); ctx.fill(); ctx.restore();
+  }
+  // the Deep's shadow: the waterline creeps up from night 9
+  if(G && !G.finale && G.night>=9){
+    const rise=(G.night-8)*3;
+    ctx.save(); ctx.globalAlpha=0.35; ctx.fillStyle='#04121c'; ctx.fillRect(0,H-14-rise,W,14+rise); ctx.restore();
+  }
+  if(rain.length){ ctx.strokeStyle='#9fb0c6'; ctx.lineWidth=2; ctx.globalAlpha=0.6; for(const p of rain){ ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x-3,p.y+p.len); ctx.stroke(); } ctx.globalAlpha=1; }
+  if(flashT>0){ ctx.fillStyle='rgba(255,255,255,'+(flashT*0.5)+')'; ctx.fillRect(0,0,W,H); }
+}
+function drawBoat(x,y,s){ const img=IMG.boat;
+  if(img){ const w=s*2.2, h=w*(img.naturalHeight/img.naturalWidth); ctx.drawImage(img,x-w/2,y-h*0.7,w,h); return; }
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle='#efe2c0'; ctx.beginPath(); ctx.moveTo(0,-s*0.9); ctx.lineTo(0,-s*0.2); ctx.lineTo(s*0.5,-s*0.3); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#c8723f'; ctx.beginPath(); ctx.moveTo(-s*0.7,-s*0.15); ctx.lineTo(s*0.7,-s*0.15); ctx.lineTo(s*0.45,s*0.35); ctx.lineTo(-s*0.45,s*0.35); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+/* ============================ LOOP ============================ */
+let last=performance.now(), acc=0;
+function frame(now){ requestAnimationFrame(frame); let dt=(now-last)/1000; last=now; if(dt>0.25) dt=0.25; acc+=dt; while(acc>=STEP){ update(STEP); acc-=STEP; } render(); }
+function update(dt){ animTime+=dt; if(shake>0) shake=Math.max(0,shake-1.4*dt); if(flashT>0) flashT=Math.max(0,flashT-dt*1.6);
+  for(let i=rain.length;i--;){ const p=rain[i]; p.y+=p.vy*dt; if(p.y>H*0.78) rain.splice(i,1); } if(rain.length>200) rain.splice(0,rain.length-200);
+}
+function render(){ const dpr=Math.min(window.devicePixelRatio||1,2); if(canvas.clientWidth>0 && Math.abs(canvas.width-Math.round(canvas.clientWidth*dpr))>2) fit();
+  const s=shake*shake; ctx.save(); if(motionOK&&s>0){ ctx.translate(8*s*(Math.random()*2-1),7*s*(Math.random()*2-1)); }
+  drawScene(); ctx.restore();
+}
+/* ============================ INPUT / BOOT ============================ */
+$('btnLight').onclick=()=>decide(true);
+$('btnDark').onclick=()=>decide(false);
+$('btnRing').onclick=()=>muster(true);
+$('btnWave').onclick=()=>muster(false);
+$('next').onclick=nextNight;
+$('bMenu').onclick=()=>{ audioOn(); autoTok++; beatTok++; state='menu'; renderOverlay(); };
+$('vol').addEventListener('input',e=>{ audioOn(); setVol((+e.target.value||0)/100); });
+addEventListener('keydown',e=>{ const k=e.key.toLowerCase();
+  if(state==='reading'){
+    if(G.isMuster && !G.musterAnswered){
+      if(k==='r'){ e.preventDefault(); muster(true); } else if(k==='w'){ e.preventDefault(); muster(false); }
+    } else {
+      if(k==='l'||k===' '){ e.preventDefault(); decide(true); } else if(k==='d'){ e.preventDefault(); decide(false); }
+    }
+  } else if(state==='resolved'){ if(k===' '||k==='enter'){ e.preventDefault(); if(!G.beat||G.beat===2) nextNight(); } } });
+['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{ audioOn(); if(state==='title'||state==='menu') theme(true); },{once:true}));
+levelIdx=0; fit(); renderOverlay(); requestAnimationFrame(frame);
+/* test seam */
+window.keeper={
+  get state(){return state;}, get level(){return levelIdx;},
+  get testMode(){return TESTMODE;}, set testMode(v){ TESTMODE=!!v; },
+  snapshot(){ return G?{ night:G.night, nights:G.lev.nights, boats:G.boats, trust:+(G.trust||0).toFixed(1), thresh:G.lev.heedThreshold,
+      catch:G.catch, target:G.lev.catchTarget, sky:+(G.sky||0).toFixed(2), storm:G.weatherStorm, inQuiet:G.inQuiet,
+      isMuster:G.isMuster, musterAnswered:G.musterAnswered, musterCall:G.musterCall, musterPhase:G.musterPhase, finale:G.finale,
+      heedP:+(G.heedP||0).toFixed(3), heedTendency:G.heedTendency, moored:G.moored, mooredHistory:G.mooredHistory.slice(),
+      isDecoy:G.isDecoy, vMinus:+(G.vMinus||0).toFixed(1), decoyTendency:G.decoyTendency, decoyMoored:G.decoyMoored,
+      decoyMooredHistory:(G.decoyMooredHistory||[]).slice(), dRight:G.dRight, dCount:G.dCount, decoyNeed:G.lev.decoyNeed||0,
+      musterRight:G.musterRight, musterCount:G.musterCount, musterNeed:G.lev.musterNeed,
+      stormsDealt:G.lev.deckStorms, stormsSpent:G.stormsSpent, nightLog:G.nightLog.slice(),
+      readiness:+(G.readiness||0).toFixed(1), ritualStrength:+(G.ritual||0).toFixed(1), drilled:G.drilled,
+      drillTendency:G.drillTendency, rations:G.rations, operant:isOperant(G.lev),
+      reason:G.endReason||null, stats:Object.assign({},G.stats) }:null; },
+  start(idx){ newGame(idx==null?levelIdx:idx); state='reading'; overlayWrap.hidden=true; renderDecision(); },
+  muster, decide, next:nextNight,
+  get over(){return state==='won'||state==='lost';}, get won(){return state==='won';} };
+</script>
+</body>
+</html>
