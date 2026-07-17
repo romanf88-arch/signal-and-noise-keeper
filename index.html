@@ -580,7 +580,7 @@ function runProbe(assoc, thresh){
   const prev = G.lastProbe;
   const p = { night:G.night, rfx:+rfx.toFixed(3), scramble, delta: prev? scramble-prev.scramble : null };
   G.probeHistory.push(p); G.lastProbe = p;
-  G.probeScene = { scramble, until: animTime + 2.6 };
+  G.probeScene = { scramble, start: animTime };
   return p;
 }
 function probePhrase(rfx){ return rfx<0.12?'A glance up, and back to the nets.'
@@ -1282,12 +1282,21 @@ function renderOverlay(){
   const youWatched = opv
     ? 'You watched the drill readiness climb as you rewarded the crew for the thing you wanted, and the idle ritual climb on the nights you rewarded them for nothing in particular. A behavior grows when it pays and fades when it stops paying, and the whole season was you deciding, night by night, which behavior to feed.'
     : 'You watched that belief rise and fall as you conditioned the crew, and you bet on it each time the harbormaster called a muster. In a real study the strength behind a learned response is invisible, inferred only from behavior like the mooring on the dock; here you got to watch the very thing that is normally hidden.';
+  // the PROBE curve: the conditioned response measured on the cold tests (CS-alone), the salivation-to-the-bell curve
+  const probeCurveSVG = (G.probeHistory && G.probeHistory.length>=2)
+    ? trustCurveSVG(G.probeHistory.map(p=>Math.round(p.scramble/CONFIG.crewN*100)), 50, null, { primary:'ran to the lamp alone', threshold:'half the crew ran to the light' })
+    : '';
+  const probeSlide = probeCurveSVG ? {
+    kicker:'The response to the signal alone', title:'The lamp, with no storm behind it',
+    visual:probeCurveSVG,
+    body:`<p>Each point is a <b>cold test</b>: the lamp raised over a flat, calm sea, counting how many of the seven crew still broke for the harbor at the signal alone. ${L.decay ? 'Watch it fall as the lamp stopped meaning a storm — the response fading on its own, which is <b>extinction</b>.' : 'Watch it climb: by the end they ran from the light itself, the way they once ran from a black sky. That reflex to the signal alone, with no storm to cause it, is the <b>conditioned response</b> — the dog salivating at the bell.'}</p>` } : null;
   if(!won){
     const slides=[
       { kicker:'The season turns', title:titles[why], visual:imgSlide(outImg,'the harbor'),
         body:`<p>${leads[why]}</p>` },
       { kicker:'What you were building', title:'The belief, made visible', visual:curveSVG,
         body:`<p>${cap}</p>` },
+      ...(probeSlide?[probeSlide]:[]),
       { kicker:'The idea, named', title:'', visual:imgSlide(face,'','portrait'),
         body:`<p>${lossLead}${L.debrief.body}</p>${conceptMap(L)}` },
       { kicker:'The season, night by night', title:'', visual:'',
@@ -1310,6 +1319,7 @@ function renderOverlay(){
       body:`<p>${leads.win}</p>${L.back?`<p style="color:#6a5a2e">${L.back}</p>`:''}` },
     { kicker:'What you were really doing', title:'The belief, made visible', visual:curveSVG,
       body:`<p>${cap}</p>` },
+    ...(probeSlide?[probeSlide]:[]),
     { kicker:'The idea, named', title:'', visual:imgSlide(face,'','portrait'),
       body:`<p>${L.debrief.body}</p>${conceptMap(L)}<p>${youWatched}</p>` },
     { kicker:'The season, night by night', title:'', visual:'',
@@ -1363,7 +1373,7 @@ function drawProbeScene(){
   ctx.save(); ctx.globalAlpha=0.16*pulse; ctx.fillStyle='#ffe39a'; ctx.beginPath(); ctx.arc(lampX,lampY,54,0,7); ctx.fill(); ctx.restore();
   ctx.save(); ctx.shadowColor='#f5c14e'; ctx.shadowBlur=32; ctx.fillStyle='#f5c14e'; ctx.beginPath(); ctx.arc(lampX,lampY,11,0,7); ctx.fill(); ctx.restore();
   const sc = G.probeScene.scramble|0, N=CONFIG.crewN;
-  const t = motionOK? Math.max(0,Math.min(1,(animTime-(G.probeScene.until-2.6))/1.1)) : 1;   // scramble runs in over ~1.1s
+  const t = motionOK? Math.max(0,Math.min(1,(animTime-(G.probeScene.start||animTime))/1.1)) : 1;   // scramble runs in over ~1.1s
   const y=H*0.84;
   for(let i=0;i<N;i++){
     const runner = i<sc;
