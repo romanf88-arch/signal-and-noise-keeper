@@ -521,6 +521,9 @@ function newGame(idx){
         emissionShown:true, readinessHistory:[L.startReadiness||0], ritualHistory:[L.startRitual||0],
         // PROBE TRIALS (CS-alone test): read-only measurement of the conditioned response. Writes nothing scored.
         probeHistory:[], lastProbe:null, probeScene:null, isExtraProbe:false,
+        // ONBOARDING (Season 1 only): reveal the belief meter and the CS/US/CR labels one at a time, as each first matters.
+        onboard:(L.id===1), coach:null,
+        reveal:(L.id===1? {belief:false,cs:false,us:false,cr:false} : {belief:true,cs:true,us:true,cr:true}),
         pools:{ calm:SKYPOOL.calm.slice(), mid:SKYPOOL.mid.slice(), heavy:SKYPOOL.heavy.slice(),
                 bLo:BARKS.lo.slice(), bMd:BARKS.md.slice(), bHi:BARKS.hi.slice(), bMiss:BARKS.miss.slice() } };
   if(L.decoyNights){
@@ -536,6 +539,9 @@ function newGame(idx){
 function rollNight(){
   G.decided=false; G.outcome=null; G.lit=false; G.moored=null; G.decoyMoored=null; G.musterPhase=0; G.reinforced=null;
   G.musterAnswered=false; G.musterCall=null; G.lastMuster=null;
+  G.coach=null;   // onboarding notes live for one night only
+  if(G.onboard && G.night>=2 && !G.reveal.belief){ G.reveal.belief=true;   // the belief meter appears once there is something to show on it
+    G.coach='The bar above is the crew’s belief in your lamp, hidden until now. It moves a little every night, up when a warning proves true and down when it comes to nothing.'; }
   const L=G.lev, last = G.night===L.nights;
   G.finale = last;
   G.inQuiet = !!(L.quiet && G.night>=L.quiet[0] && G.night<=L.quiet[1]);
@@ -620,6 +626,15 @@ function gossipLine(){
   const t=G.trust;
   return t<34? GOSSIP.lo : t<=66? GOSSIP.md : GOSSIP.hi;
 }
+// Season 1 onboarding: reveal each CS/US/CR label the first time its real thing appears on screen, with a note.
+function onboardReveal(lit, storm, moored){
+  if(!G.onboard) return;
+  const r=G.reveal, msgs=[];
+  if(lit && !r.cs){ r.cs=true; msgs.push('You lit the lamp. That light is the signal you are teaching the crew to read; psychologists call it the <b>CS</b>, the conditioned stimulus.'); }
+  if(storm && !r.us){ r.us=true; msgs.push('A storm came. That is the real danger the lamp warns of, the <b>US</b>, the unconditioned stimulus.'); }
+  if(lit && moored!=null && moored>=1 && !r.cr){ r.cr=true; msgs.push('Some of the crew stayed in port on the lamp alone. Staying in is the learned response you are building, the <b>CR</b>.'); }
+  if(msgs.length) G.coach = msgs.join(' ');
+}
 /* ============================ THE DECISION ============================ */
 function decide(arg){
   if(state!=='reading' || G.decided) return;
@@ -698,6 +713,7 @@ function decide(arg){
   const concept = conceptNote(kind, dTrust, dVMinus, G.lev, G.isDecoy, lit);
   G.outcome = { kind, head, body, dTrust, lostBoat, earned, storm, heedNow, insight, bark, firstOfKind, concept, moored, decoyMoored:G.decoyMoored };
   G.log.push(kind);
+  onboardReveal(lit, storm, moored);   // Season 1: reveal CS/US/CR as each first appears
   if(insight) playSnd('page_turn',0.4);
   state='resolved'; presentOutcome();
 }
@@ -959,11 +975,22 @@ function renderDecision(){
   $('wrap').classList.add('playing');
   { const bm=$('bMenu'); if(bm) bm.hidden=false; }
   const L=G.lev, op=isOperant(L);
-  $('legend').innerHTML = op
-    ? '💪 the drill = the crew’s own action <b>(operant behavior)</b> &nbsp;·&nbsp; 🥃 the ration = the reward that follows it <b>(reinforcer)</b>'
-    : L.id===3
-    ? '🔦 your lamp = the reliable signal <b>(CS+)</b> &nbsp;·&nbsp; 🏮 Sefu’s lantern = the look-alike <b>(CS-)</b> &nbsp;·&nbsp; ⚓ crew mooring = the response <b>(CR)</b>'
-    : '🔦 the lamp = the signal <b>(CS)</b> &nbsp;·&nbsp; ⛈ the storm = the danger it warns of <b>(US)</b> &nbsp;·&nbsp; ⚓ the crew mooring = the learned response <b>(CR)</b>';
+  const coachHTML = G.coach ? '<div style="margin-top:7px;color:#f5d98a;background:rgba(245,193,78,.10);border:1px solid rgba(245,193,78,.42);border-radius:8px;padding:7px 11px;font-family:\'Spectral\',serif;font-size:13px;line-height:1.5;text-align:left">'+G.coach+'</div>' : '';
+  if(G.onboard){   // Season 1: the labels appear one at a time, as each first matters
+    const parts=[];
+    if(G.reveal.cs) parts.push('🔦 the lamp = the signal <b>(CS)</b>');
+    if(G.reveal.us) parts.push('⛈ the storm = the danger it warns of <b>(US)</b>');
+    if(G.reveal.cr) parts.push('⚓ the crew staying in = the learned response <b>(CR)</b>');
+    $('legend').innerHTML = parts.join(' &nbsp;·&nbsp; ') + coachHTML;
+    $('legend').hidden = (parts.length===0 && !G.coach);
+  } else {
+    $('legend').hidden = false;
+    $('legend').innerHTML = (op
+      ? '💪 the drill = the crew’s own action <b>(operant behavior)</b> &nbsp;·&nbsp; 🥃 the ration = the reward that follows it <b>(reinforcer)</b>'
+      : L.id===3
+      ? '🔦 your lamp = the reliable signal <b>(CS+)</b> &nbsp;·&nbsp; 🏮 Sefu’s lantern = the look-alike <b>(CS-)</b> &nbsp;·&nbsp; ⚓ crew mooring = the response <b>(CR)</b>'
+      : '🔦 the lamp = the signal <b>(CS)</b> &nbsp;·&nbsp; ⛈ the storm = the danger it warns of <b>(US)</b> &nbsp;·&nbsp; ⚓ the crew mooring = the learned response <b>(CR)</b>');
+  }
   $('sNight').textContent = G.night+' / '+L.nights;
   $('sBoats').textContent = G.boats>0 ? '⛵'.repeat(G.boats) : '·';
   $('sSquall').previousElementSibling.textContent = op? 'Rations' : 'Squalls';
@@ -980,6 +1007,7 @@ function renderDecision(){
   else if(G.finale){ dc.hidden=false; dc.innerHTML='<b>The night of the Deep.</b>'; }
   else dc.hidden=true;
   renderBelief();
+  $('belief').hidden = (G.onboard && !G.reveal.belief);   // the meter appears once the crew have started to learn
   $('log').innerHTML = G.log.slice(-12).map(k=>{
     const t={hit:'right',fa:'cried wolf',miss:'missed',cr:'calm',coFa:'both lit',decoyClear:'stood clear',reinDrill:'rewarded',holdDrill:'held',reinRitual:'mis-rewarded',holdRitual:'saved'}[k]||'·';
     const cls={coFa:'fa',decoyClear:'cr',reinDrill:'hit',holdDrill:'miss',reinRitual:'fa',holdRitual:'cr'}[k]||k;
