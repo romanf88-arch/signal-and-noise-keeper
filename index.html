@@ -585,7 +585,44 @@ function buyItem(key){
   if(key==='hulls') save.hulls = Math.min(8, (save.hulls||5)+1);
   else save[key] = (save[key]||0) + 1;
   audioOn(); if(!playSnd('page_turn',0.45)) {}
-  saveProgress(); renderShop();
+  saveProgress(); showBuyDialogue(key);   // Marisol explains the psychology behind it, then back to the shop
+}
+// a short character exchange after each purchase: the concept + the real research behind it, in plain talk
+const BUY_DLG = {
+  pollTier: [
+    { who:'marisol', line:"Smart first buy. You can't see trust directly, can you? It's just an idea in people's heads. So instead, you measure it. You poll the fishermen and ask, plainly, how much they believe the lamp." },
+    { who:'marisol', line:"That's the trick scientists use for anything they can't see, like fear, or hunger, or memory. They find something they can actually count that stands in for it. They call it operationalizing, and every honest study starts there." },
+  ],
+  instrTier: [
+    { who:'marisol', line:"Good. Now, a better glass will never tell you for sure that a storm is coming. Nothing can. But it makes the reading clearer, so you will guess wrong less often." },
+    { who:'marisol', line:"Scientists call that sensitivity. Give someone a sharper tool, or train them well, and they get better at telling a real signal from random noise. It's the same skill a radar operator or a doctor reading an x-ray spends years building." },
+  ],
+  hulls: [
+    { who:'marisol', line:"An extra boat. Now if you guess wrong and one gets caught out in a storm, it isn't the end of you. You can afford a mistake or two." },
+    { who:'marisol', line:"And that should change how you play. When a wrong call is cheap, you can risk letting them fish on an iffy night. When it's expensive, you warn more. How much a mistake costs you is what decides how careful to be." },
+  ],
+  storageTier: [
+    { who:'marisol', line:"A bigger ice cellar. Now you can keep more of the extra fish before they spoil, and that's more money when the season ends." },
+    { who:'marisol', line:"There's a catch, though. Pile up more than you can store and the rest just rots. A reward is worth less and less once you have more than you can use. Ask anyone who's eaten the tenth cookie in a row." },
+  ],
+  adTier: [
+    { who:'marisol', line:"The criers will shout your catch through the whole market now, so each fish sells for a bit more. Same work, more money." },
+    { who:'marisol', line:"Here's the funny part. That money isn't really what you want, is it? It's food, a warm house, a future for your kids. We chase money because it's been tied to all of that our whole lives. Scientists call it a secondary reinforcer, a reward that only became one by association." },
+  ],
+};
+let _buyDlg=null, _buyIx=0;
+function showBuyDialogue(key){ _buyDlg=BUY_DLG[key]; _buyIx=0; if(!_buyDlg||!_buyDlg.length){ renderShop(); return; } renderBuyDlg(); }
+function renderBuyDlg(){
+  const b=_buyDlg&&_buyDlg[_buyIx]; if(!b){ _buyDlg=null; renderShop(); return; }
+  const last=_buyIx===_buyDlg.length-1;
+  overlayWrap.hidden=false; overlayWrap.classList.add('titlescreen'); overlay.style.cssText=''; updateCoins();
+  const fig='<img class="vn-fig left" src="assets/portrait_'+b.who+'.webp" alt="'+(TUT_NAMES[b.who]||b.who)+'" onerror="this.style.display=\'none\'">';
+  overlay.innerHTML = `<div class="vnwrap"><div class="vn-portraits">${fig}</div>
+    <div class="vn-box"><div class="vn-name">${TUT_NAMES[b.who]||b.who}</div>
+      <div class="vn-text">${b.line}</div>
+      <div class="vn-cont"><button class="bigbtn vn-btn gold" id="buyDlgBtn" type="button">${last?'Back to the shop':'Continue ▸'}</button></div>
+    </div><div class="vn-step">${_buyIx+1} / ${_buyDlg.length}</div></div>`;
+  $('buyDlgBtn').onclick=()=>{ audioOn(); _buyIx++; renderBuyDlg(); };
 }
 function renderShop(){
   overlayWrap.hidden=false; overlayWrap.classList.remove('titlescreen'); overlay.style.cssText='';
@@ -1762,7 +1799,8 @@ addEventListener('keydown',e=>{ const k=e.key.toLowerCase();
     }
   } else if(state==='resolved'){ if(k===' '||k==='enter'){ e.preventDefault(); if(!G.beat||G.beat===2) nextNight(); } }
   else if(state==='won'||state==='lost'){ if(slideKey(k)) e.preventDefault(); }
-  else if(state==='tutorial'){ if(k===' '||k==='enter'){ e.preventDefault(); const b=$('tutBtn'); if(b) b.click(); } } });
+  else if(state==='tutorial'){ if(k===' '||k==='enter'){ e.preventDefault(); const b=$('tutBtn'); if(b) b.click(); } }
+  else if(state==='shop' && $('buyDlgBtn')){ if(k===' '||k==='enter'){ e.preventDefault(); $('buyDlgBtn').click(); } } });
 ['pointerdown','keydown'].forEach(ev=>addEventListener(ev,()=>{ audioOn(); if(state==='title'||state==='menu') theme(true); },{once:true}));
 levelIdx=0; fit(); renderOverlay(); requestAnimationFrame(frame);
 /* test seam */
