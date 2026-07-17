@@ -465,7 +465,7 @@ const LEVELS = [
     back:null,
     nights:14, deckStorms:5, strata:[[1,4,1],[5,9,3],[10,13,1]],   // [fromNight,toNight,storms]
     startTrust:26, heedThreshold:50, catchTarget:40, startBoats:7, decay:0, quiet:null,
-    musterNights:[2,5,8,11,13], musterNeed:4,
+    musterNights:[4,6,8,11,13], musterNeed:4,
     almanac:'Marisol, at the season’s first tide: “The almanac promises five great squalls, and after them the Deep.”',
     story:{ era:'St. Petersburg, the 1900s',
       body:'Ivan Pavlov was studying how dogs digest their food. He noticed something strange. The dogs started to drool before any food showed up, as soon as they heard the footsteps of the man who fed them. So Pavlov tried a test. He rang a bell right before each meal, over and over. After enough meals, the bell by itself made the dogs drool, with no food in sight. A sound that used to mean nothing now meant that food was coming.',
@@ -666,7 +666,7 @@ const TUT=[
   { who:'marisol', line:"Your lamp is the same. Right now it means nothing to them. But if you only light it when a storm is really coming, over and over, they will learn that the lamp means danger. Then they come in every time you light it." },
   { who:'marisol', act:'salary', line:"That takes time, and time takes money. Here is your first paycheck. It is not much, twenty dollars, but it is a start." },
   { who:'marisol', act:'shop', line:"Take it to the shop next door. Most of it you cannot afford yet. But you can buy the newspaper, which polls the fishermen so you can see how much they trust you. Get that one." },
-  { who:'marisol', act:'begin', line:"Good, the paper is yours now. Before long it will show you how much the crews trust your lamp. Now go read the sky, warn them true, and keep this town fed." },
+  { who:'marisol', act:'begin', line:"Good, the paper is yours now. From your very first night it will show you how much the crews trust your lamp. Now go read the sky, warn them true, and keep this town fed." },
 ];
 function startTutorial(){ state='tutorial'; tutIx=0; tutStorm=false; _shopReturn=null;
   save.money=0; save.pollTier=0; G=null; overlayWrap.hidden=false; showBgVideo(false); renderTutorial(); }
@@ -745,8 +745,8 @@ function newGame(idx){
         // ONBOARDING (Season 1 only): reveal the HUD one piece per night. Keyed to the level, NOT a persisted flag,
         // so it runs on every Season-1 play (a replay used to dump everything at once once uiTaught had been saved).
         onboard:(L.id===1), coach:null,
-        reveal:(L.id===1? {cs:false,us:false,cr:false,intro:false,boats:false,catch:false,squalls:false,meter:false}
-                        : {cs:true,us:true,cr:true,intro:true,boats:true,catch:true,squalls:true,meter:true}),
+        reveal:(L.id===1? {cs:false,us:false,cr:false,intro:false,boats:false,catch:false,squalls:false,meter:false,musterTaught:false}
+                        : {cs:true,us:true,cr:true,intro:true,boats:true,catch:true,squalls:true,meter:true,musterTaught:true}),
         pools:{ calm:SKYPOOL.calm.slice(), mid:SKYPOOL.mid.slice(), heavy:SKYPOOL.heavy.slice(),
                 bLo:BARKS.lo.slice(), bMd:BARKS.md.slice(), bHi:BARKS.hi.slice(), bMiss:BARKS.miss.slice() } };
   if(L.decoyNights){
@@ -765,12 +765,14 @@ function rollNight(){
   G.coach=null;   // onboarding notes live for one night only
   if(G.onboard){   // Season 1: introduce one piece of the screen per night, each with a plain callout
     const r=G.reveal;
-    if(G.night===1 && !r.intro){ r.intro=true;
-      G.coach = (save.instrTier<1)
-        ? 'You have no barometer yet, so you cannot really read the sky tonight. All you get is the line just below, a few vague words, and you have to guess from those. Light the lamp to warn the crews and keep them safe in port, or leave it dark and let them sail out to fish. You cannot do both, and a wrong guess will cost you. Later you can buy a barometer for a steadier read.'
-        : 'Read the dial and the line just below, then make your call. Light the lamp to warn the crews and keep them safe in port, or leave it dark and let them sail out to fish. You cannot do both, and a wrong guess will cost you.'; }
-    else if(G.night===2 && !r.meter){ r.boats=true; r.squalls=true; r.meter=true; G.coach='Now the stakes show up top: your boats, and the big storms the almanac expects this season. Lose every boat and the season ends. The bar below is the crew’s trust in your lamp, from the newspaper you bought. Tonight the harbormaster calls a muster and asks you to read it: above the line the crew would heed a lit lamp, below it they would sail past it.'; }
-    else if(G.night===3 && !r.catch){ r.catch=true; G.coach='New up top: your catch. The town needs enough fish to make it through winter. Every night the crews stay in port, they land nothing, so you cannot warn them for no reason.'; }
+    if(G.night===1 && !r.intro){ r.intro=true; r.meter=true;
+      G.coach = (save.instrTier<1
+        ? 'Two things before you decide. You have no barometer yet, so tonight you are guessing the weather from the few words in the line below, and a wrong guess costs you. '
+        : 'Read the dial and the line just below to judge the storm. ')
+        + 'And that bar is the crew’s trust in your lamp, the poll you paid the newspaper for. It sits low, because the last keeper burned through it. Light the lamp only when a storm is really coming, and over the nights it will climb.'; }
+    else if(G.night===2 && !r.boats){ r.boats=true; r.squalls=true; G.coach='New up top: your boats, and the big storms the almanac expects this season. The boats are the whole town’s living, so if you lose every one, the season is over. Warn the crew at the right times and you keep them and their boats safe.'; }
+    else if(G.night===3 && !r.catch){ r.catch=true; G.coach='Last piece up top: your catch. The town needs enough fish to make it through winter, and the crew only land fish on the nights they sail. So you cannot warn them for no reason, or the town goes hungry. Safe in port, or out fishing: that is the whole tension.'; }
+    else if(G.night===4 && !r.musterTaught){ r.musterTaught=true; G.coach='Tonight the harbormaster calls a muster. Before the crew turns out, she wants your read: if you lit the lamp right now, would they heed it and stay in? Look at the trust bar. Above the line they come in, below it they sail past. You are predicting what they will do from the trust you have built.'; }
   }
   const L=G.lev, last = G.night===L.nights;
   G.finale = last;
