@@ -463,8 +463,8 @@ const LEVELS = [
   { id:1, name:'The Keeper', term:'a conditioned signal',
     objective:'Earn the crew’s trust. Warn them only when a storm is truly coming, so your lamp comes to mean danger and they learn to heed it. Read them right at the musters to show the trust is real, and it will hold when the Deep comes.',
     back:null,
-    nights:14, deckStorms:5, strata:[[1,4,1],[5,9,3],[10,13,1]],   // [fromNight,toNight,storms]
-    startTrust:26, heedThreshold:50, catchTarget:40, catchGoal:false, aWolf:0.14, minFleet:6, startBoats:7, decay:0, quiet:null,
+    nights:14, deckStorms:5, strata:[[3,4,1],[5,9,3],[10,13,1]],   // [fromNight,toNight,storms]; nights 1-2 always calm so the first boat can fish before any storm
+    startTrust:26, heedThreshold:50, catchTarget:40, catchGoal:false, aWolf:0.14, startBoats:7, decay:0, quiet:null,
     musterNights:[4,6,8,11,13], musterNeed:3,
     almanac:'Marisol, at the season’s first tide: “The almanac promises five great squalls, and after them the Deep.”',
     story:{ era:'St. Petersburg, the 1900s',
@@ -649,7 +649,7 @@ function renderShop(){
     <div style="margin-top:12px"><button class="btn" id="bShopBack" type="button">⚓ Back to the harbor</button></div>`;
   overlay.querySelectorAll('[data-buy]').forEach(b=> b.onclick=()=>buyItem(b.getAttribute('data-buy')));
   $('bShopBack').textContent = (_shopReturn==='tutorial') ? 'Done. Set sail ▸' : '⚓ Back to the harbor';
-  $('bShopBack').onclick=()=>{ if(_shopReturn==='tutorial'){ _shopReturn=null; save.pollTier=Math.max(1,save.pollTier); save.hulls=Math.max(6,save.hulls||1); saveProgress(); tutIx++; state='tutorial'; renderTutorial(); } else { state='menu'; renderOverlay(); } };
+  $('bShopBack').onclick=()=>{ if(_shopReturn==='tutorial'){ _shopReturn=null; save.pollTier=Math.max(1,save.pollTier); saveProgress(); tutIx++; state='tutorial'; renderTutorial(); } else { state='menu'; renderOverlay(); } };
   updateCoins();
 }
 /* ============================ THE TUTORIAL (Season 1 prologue: "Earn the Lamp") ============================ */
@@ -669,9 +669,9 @@ const TUT=[
   { who:'marisol', link:true, line:"After a while, the dogs started drooling the moment they heard the bell, before any food showed up. The bell had come to mean food is coming." },
   { who:'marisol', line:"Your lamp is the same. Right now it means nothing to them. But if you only light it when a storm is really coming, over and over, they will learn that the lamp means danger. Then they come in every time you light it." },
   { who:'marisol', line:"One last thing the old keeper wrecked: the fleet. He never called the storms, so boat after boat went down, until the whole town had a single boat left. That one is tied up at your dock right now." },
-  { who:'marisol', act:'salary', line:"But the town is not done for. They pooled the savings they had and put the purse in your hands, to get boats back on the water. Every boat you buy goes out and fishes, season after season. It costs you now and pays you back slowly, and that patience is how anything worth having gets built." },
-  { who:'marisol', act:'shop', line:"Take it to the chandlery. Rebuild the fleet as far as the money goes, and pick up the newspaper too, so you can read how much the crew trust you." },
-  { who:'marisol', act:'begin', line:"Good. A real fleet under you, and a paper to read the crew. Now go earn their trust, warn them true, and put this town back on its feet." },
+  { who:'marisol', act:'salary', line:"The town can barely pay you. Here is a little to start, just enough for the newspaper, so you can see how far the crew trust the lamp. The fleet you will have to rebuild the slow way, one boat at a time, out of what the fishing brings in." },
+  { who:'marisol', act:'shop', line:"Take it to the chandlery and buy the newspaper. The boats will have to wait until you have earned the money for them, season by season." },
+  { who:'marisol', act:'begin', line:"One boat and a paper to read the crew. It is not much, but it is a start. Go earn their trust, warn them true, and build this town back up over the seasons to come." },
 ];
 function startTutorial(){ state='tutorial'; tutIx=0; tutStorm=false; _shopReturn=null;
   save.money=0; save.pollTier=0; save.hulls=1; save.instrTier=0; save.storageTier=0; save.adTier=0;   // a ruined town: one boat, nothing bought yet
@@ -679,7 +679,7 @@ function startTutorial(){ state='tutorial'; tutIx=0; tutStorm=false; _shopReturn
 function renderTutorial(){
   const b=TUT[tutIx]; if(!b){ save.tutDone=true; saveProgress(); levelIdx=0; startLevel(); return; }
   tutStorm=!!b.storm;
-  if(b.act==='salary' && save.money<150){ save.money=150; saveProgress(); }   // the town's rebuild fund appears in the counter as she hands it over
+  if(b.act==='salary' && save.money<20){ save.money=20; saveProgress(); }   // a thin starting wage: enough for the newspaper, nothing more. the fleet is rebuilt through play.
   overlayWrap.hidden=false; overlayWrap.classList.add('titlescreen'); overlay.style.cssText='background:transparent;border:none;box-shadow:none;padding:0;max-width:none;max-height:none;overflow:visible'; updateCoins();
   const fig=(w,cls)=> '<img class="vn-fig '+cls+'" src="assets/portrait_'+w+'.webp" alt="'+(TUT_NAMES[w]||w)+'" onerror="this.style.display=\'none\'">';
   const link = b.link? '<a class="vn-link" href="'+LEVELS[0].story.url+'" target="_blank" rel="noopener">Read the real story of Pavlov and his dogs ↗</a>':'';
