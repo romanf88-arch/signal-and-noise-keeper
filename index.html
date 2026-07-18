@@ -597,30 +597,37 @@ function buyItem(key){
   saveProgress(); showBuyDialogue(key);   // Marisol explains the psychology behind it, then back to the shop
 }
 // a short character exchange after each purchase: the concept + the real research behind it, in plain talk
+// each entry is either a fixed 2-beat exchange, or a function of the item's new tier/count so the talk changes per purchase.
 const BUY_DLG = {
   pollTier: [
-    { who:'marisol', line:"Smart first buy. You can't see trust directly, can you? It's just an idea in people's heads. So instead, you measure it. You poll the fishermen and ask, plainly, how much they believe the lamp." },
-    { who:'marisol', line:"That's the trick scientists use for anything they can't see, like fear, or hunger, or memory. They find something they can actually count that stands in for it. They call it operationalizing, and every honest study starts there." },
+    { who:'marisol', line:"Smart first buy. You cannot see trust, can you. It is only an idea inside people's heads. So you do the next best thing and measure it, by polling the crew on how far they believe the lamp." },
+    { who:'marisol', line:"That is the move behind every honest study. When you cannot see the thing itself, fear, hunger, memory, trust, you find something you can count that stands in for it. Psychologists call that operationalizing, and it is where the science starts." },
   ],
-  instrTier: [
-    { who:'marisol', line:"A proper barometer. Now you get a dial that shows which way the pressure is leaning, toward a storm or toward calm. It won't tell you for sure, nothing can, but it beats guessing from the look of the sky." },
-    { who:'marisol', line:"That's what a good instrument buys you: sensitivity. A sharper tool makes it easier to tell a real signal from random noise. It's the same skill a radar operator or a doctor reading an x-ray spends years training." },
+  instrTier: (n)=> n<=1 ? [
+    { who:'marisol', line:"A barometer. Now the sky is not just a guess. The dial leans toward a storm or toward calm, and you decide from a reading instead of a feeling." },
+    { who:'marisol', line:"What you are really buying is sensitivity, the power to tell a real signal from noise. It never makes you certain, no instrument does, but it moves more of your calls onto the right side of the line. That is the whole idea behind signal detection." },
+  ] : [
+    { who:'marisol', line:"A finer glass than your barometer. It holds steady in a rising wind and shows the pressure sooner, so a storm gives itself away a little earlier." },
+    { who:'marisol', line:"Every step up in an instrument buys the same thing, a sharper split between signal and noise. A radar operator, a doctor reading a scan, a keeper reading the sky, they are all training the one skill, and that skill is sensitivity." },
   ],
-  hulls: [
-    { who:'marisol', line:"Another boat back on the water. It cost you now, but it will fish for you every calm night from here on, and that catch is money in your pocket season after season. Spend a little today to earn more tomorrow. That trade is the whole idea behind investing." },
-    { who:'marisol', line:"A bigger fleet changes how you play, too. When you have boats to spare, losing one to a storm is not the end of you, so you can let them fish on an iffy night. How much a mistake would cost is exactly what should decide how careful to be." },
+  hulls: (n)=> n<=2 ? [
+    { who:'marisol', line:"Another boat on the water. You feel that already, do you not, the sting of what it cost. Losing something we own hurts more than gaining the same thing pleases us, and psychologists call that loss aversion. It is exactly why an empty berth weighs on a crew." },
+    { who:'marisol', line:"But a boat is not only a cost, it is a cushion. When a wrong warning can only lose you one of many, you can afford to let them fish on an iffy night. How much a mistake would cost you is what should set how careful you are." },
+  ] : [
+    { who:'marisol', line:"Notice each new boat costs more than the last, and each one adds a little less than the boat before it. That is diminishing returns, and it is why you should not pour every coin into hulls. Past a point, a barometer or the criers buys you more than one more boat would." },
+    { who:'marisol', line:"Still, a deep fleet is a steady nerve. With boats to spare, one bad storm is a setback and not the end. Just weigh the rising price against what the boat will actually bring you." },
   ],
   storageTier: [
-    { who:'marisol', line:"A bigger ice cellar. Now you can keep more of the extra fish before they spoil, and that's more money when the season ends." },
-    { who:'marisol', line:"There's a catch, though. Pile up more than you can store and the rest just rots. A reward is worth less and less once you have more than you can use. Ask anyone who's eaten the tenth cookie in a row." },
+    { who:'marisol', line:"A bigger ice cellar. Now more of the extra catch keeps instead of spoiling, and that is more coin when the season turns." },
+    { who:'marisol', line:"But watch the pattern. The first cellar was a gift. Each one after holds a little less that you would have lost anyway. A reward is worth less and less the more of it you already have, which is why the tenth cookie never tastes like the first." },
   ],
   adTier: [
-    { who:'marisol', line:"The criers will shout your catch through the whole market now, so each fish sells for a bit more. Same work, more money." },
-    { who:'marisol', line:"Here's the funny part. That money isn't really what you want, is it? It's food, a warm house, a future for your kids. We chase money because it's been tied to all of that our whole lives. Scientists call it a secondary reinforcer, a reward that only became one by association." },
+    { who:'marisol', line:"The criers will call your catch through the whole market now, so each fish fetches a little more. Same nets, more coin." },
+    { who:'marisol', line:"And here is the strange thing about that coin. It is not what you actually want, is it. You want food, a warm house, a future for the children. Money only became a reward because it has been paired with all of that your whole life. Scientists call that a secondary reinforcer, a reward learned by association, the same way the crew learned the lamp." },
   ],
 };
 let _buyDlg=null, _buyIx=0;
-function showBuyDialogue(key){ _buyDlg=BUY_DLG[key]; _buyIx=0; if(!_buyDlg||!_buyDlg.length){ renderShop(); return; } renderBuyDlg(); }
+function showBuyDialogue(key){ let e=BUY_DLG[key]; if(typeof e==='function') e=e(save[key]!=null?save[key]:0); _buyDlg=e; _buyIx=0; if(!_buyDlg||!_buyDlg.length){ renderShop(); return; } renderBuyDlg(); }
 function renderBuyDlg(){
   const b=_buyDlg&&_buyDlg[_buyIx]; if(!b){ _buyDlg=null; renderShop(); return; }
   const last=_buyIx===_buyDlg.length-1;
