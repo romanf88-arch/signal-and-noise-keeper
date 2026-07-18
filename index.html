@@ -656,9 +656,9 @@ function renderDialogue(){
 }
 // the pre-finale exchange for Season 1: Marisol explains the Deep and ties the choice to the conditioned response.
 const DEEP_INTRO=[
-  { who:'marisol', line:"Tomorrow is the lowest tide of the year, and that is the night the Deep comes. It is not a storm. It gives no sign in the sky and nothing in the glass, so tonight there is nothing for you to read." },
-  { who:'marisol', line:"The only thing that stands between the crew and the Deep is whether they trust your lamp enough to heed it with no storm in sight. If you built that trust all season, light the lamp and ring the bell, and they will come in and be safe." },
-  { who:'marisol', link:'https://en.wikipedia.org/wiki/Classical_conditioning', linkText:'Read about the conditioned response ↗', line:"This is the real test of everything you taught them. A crew that runs for the harbor at the lamp alone, with nothing in the sky to cause it, is showing you a conditioned response. So look at the trust bar before you choose. Above the line, they will heed the lamp. Below it, they sail into the Deep." },
+  { who:'marisol', line:"Tomorrow is the lowest tide of the year, and that is when the Deep comes. The Deep is not a storm. It is a great beast that rises from the deep water once a year, and unlike a storm it gives no sign at all. The sky stays clear and the glass reads calm, so you cannot see it coming the way you see a storm." },
+  { who:'marisol', line:"So there is no weather to judge tomorrow night. The only thing that stands between the crew and the Deep is whether they trust your lamp enough to heed it even with clear skies. If you built that trust all season, light the lamp and ring the bell, and they will come in and be safe." },
+  { who:'marisol', link:'https://en.wikipedia.org/wiki/Classical_conditioning', linkText:'Read about the conditioned response ↗', line:"This is the real test of everything you taught them. A crew that comes into port at the lamp alone, with a clear sky and no danger they can see, is showing you a conditioned response. So watch the trust bar before you choose. Above the line, they heed the lamp. Below it, they sail out to meet the Deep." },
 ];
 const FINALE_INTROS={ 1:DEEP_INTRO };   // per-season pre-finale exchange, keyed by level id
 function renderShop(){
@@ -1380,7 +1380,7 @@ function renderDecision(){
       else { $('btnRing').disabled=false; $('btnWave').disabled=false; }
       const mstake = (!G.finale && !G.isDecoy && G.lev.musterNeed) ? '<div class="small" style="margin-top:8px;color:#f5c14e">You must read the crew right on at least <b>'+G.lev.musterNeed+' of the season’s '+G.lev.musterNights.length+'</b> musters, or you lose their trust and the season. Right so far: <b>'+G.musterRight+'</b>.</div>' : '';
       cl.innerHTML = G.finale
-        ? '<b>The lowest tide of the year. The water has gone wrong, and the glass shows nothing.</b><br>There is no storm to read tonight. Read the trust bar instead'+(G.isDecoy?', and whether the crew can still tell your lamp from Sefu’s':'')+': above the line, they trust the lamp enough to heed it blind. Ring the bell to call them in, or wave the fleet out.'
+        ? '<b>The lowest tide of the year. The sky is clear, and the glass reads calm, but the Deep is coming all the same.</b><br>There is no weather to judge tonight, so read the trust bar instead'+(G.isDecoy?', and whether the crew can still tell your lamp from Sefu’s':'')+': above the line, they trust the lamp enough to heed it with clear skies. Ring the bell to call them in, or wave the fleet out.'
         : askDecoy
           ? '<div style="text-align:center">'+face+'<div>Now Sefu’s lantern. <b>If only his lantern were lit tonight, and not your lamp, would the crew still turn for it?</b> Go by what the dock has shown you, not by what you hope they have learned.</div></div>'
           : '<div style="text-align:center">'+face+'<div>'+(G.isDecoy?'The harbormaster wants two reads before the night turns. First, the tower lamp: ':'The harbormaster wants your read before the night turns. ')+'<b>If the lamp burned tonight, would the crew heed it and stay in?</b> Read the belief you have built.'+mstake+'</div></div>';
