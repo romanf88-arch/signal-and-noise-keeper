@@ -333,6 +333,9 @@ let auxRng = mulberry32(((Math.random()*1e9)|0) || 101);   // isolated: probes +
 function gauss(){ let u=0,v=0; while(!u)u=rng(); while(!v)v=rng(); return Math.sqrt(-2*Math.log(u))*Math.cos(6.28318*v); }
 function gaussAux(){ let u=0,v=0; while(!u)u=auxRng(); while(!v)v=auxRng(); return Math.sqrt(-2*Math.log(u))*Math.cos(6.28318*v); }
 function binom(n,p){ let k=0; for(let i=0;i<n;i++) if(rng()<p) k++; return k; }
+// how many of the seven crews heeded, said in words. Keeps the magnitude without printing "0 of seven" next to a one-boat fleet.
+function crewWord(m){ const n=CONFIG.crewN; if(m<=0) return 'none of the crew'; if(m>=n) return 'the whole crew'; if(m>=n*0.65) return 'most of the crew'; if(m>=n*0.35) return 'about half the crew'; return 'only a few of the crew'; }
+function ucFirst(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
 function binomAux(n,p){ let k=0; for(let i=0;i<n;i++) if(auxRng()<p) k++; return k; }   // probe scramble only
 // THE STORM INSTRUMENT (Storm-Glass -> Barometer -> Radar): a bought upgrade that sharpens the READ of the
 // dealt weather, never the weather itself. It blends the primary gauge read (on rng) with an extra reading
@@ -472,7 +475,7 @@ const LEVELS = [
       tie:'In this season, your lamp is Pavlov’s bell and the storm is the food. The crew learning to trust the light is the dog learning to drool at the bell. Warn them honestly, night after night, and watch that trust build.',
       url:'https://en.wikipedia.org/wiki/Ivan_Pavlov' },
     intro:'You keep the only lighthouse on a foggy coast. Each night you either warn the crew that a storm is coming, or leave the lamp dark and let them sail out to fish. Over a season, the crew learn on their own whether your lamp is worth trusting.',
-    debrief:{ body:'You taught the crew to trust the lamp. A warning earns their trust only when it keeps coming before a real storm, and it loses trust every time it warns of a storm that never arrives. When a signal comes to stand for whatever follows it, psychologists call it <b>a conditioned signal</b>. Building that response up, night by night, is called <b>acquisition</b>.',
+    debrief:{ body:'The lamp comes to mean danger to the crew only when it keeps warning them before a real storm, night after night, and it loses that meaning every time it warns of a storm that never arrives. A signal that comes to stand for what follows it, the way the lamp comes to stand for the storm, is what psychologists call <b>a conditioned signal</b>, and the slow building of that response over many nights is called <b>acquisition</b>.',
       transfer:'A fire alarm that goes off for burnt toast twice a week. What happens to how people act on it, and why?',
       url:'https://nobaproject.com/modules/conditioning-and-learning' } },
   { id:2, name:'The Quiet Stretch', term:'extinction',
@@ -562,23 +565,23 @@ function shopItems(){ const all = [
     cost: save.pollTier<1?15:null, gated:false,
     effect: save.pollTier>=1?'You can read the crew’s belief on the meter.':'Reveals the belief meter, a read on how far the crews trust your lamp.',
     teach:'You cannot see trust directly, so you pay for a poll that measures it. Turning a hidden idea into a number you can track is what psychologists call operationalizing it.' },
-  { key:'instrTier', name:'The Barometer', sub:['not owned','a barometer','an upgraded glass','a radar'][save.instrTier]||'a radar',
+  { key:'instrTier', name:['The Barometer','A Finer Glass','A Radar Set','Your Radar'][save.instrTier],
+    sub:'you have '+['no instrument yet','a barometer','a finer glass','a radar'][save.instrTier],
     cost:[40,70,110][save.instrTier]!=null?[40,70,110][save.instrTier]:null,
     gated: save.instrTier===2 && maxUnlocked<2,
-    effect: save.instrTier===0 ? 'Adds a dial that reads the sky, plus a sharper read. Without it you go on the weather in words alone.'
-      : 'Your read of the sky: '+['','clear','sharper still','the clearest a keeper can buy'][save.instrTier],
+    effect:['A dial that reads the sky, a real reading instead of the weather in words alone.','Steadier than your barometer in a rising wind, and clearer when the sky closes in.','The sharpest read of a storm a keeper can buy.','The clearest read a keeper can buy.'][save.instrTier],
     teach:'A better instrument tells the storm’s signal from the noise in the sky. Psychologists call that sensitivity, and a sharper tool raises it, though it never makes you certain.' },
-  { key:'hulls', name:'Another Boat', sub: save.hulls+' in your fleet',
+  { key:'hulls', name:'Another Boat', sub: save.hulls+(save.hulls===1?' boat in your fleet':' boats in your fleet'),
     cost: save.hulls<8? (25 + 10*Math.max(0,save.hulls-5)) : null, gated:false,
-    effect: save.hulls+' boats. If you lose them all in one season, the season is over.',
+    effect: 'Adds a boat, bringing your fleet to '+(save.hulls+1)+'. If you lose them all in one season, the season is over.',
     teach:'With more boats, losing one to a storm hurts less. And how much a mistake costs you is exactly what should decide how careful you are about warning.' },
-  { key:'storageTier', name:'The Ice Cellar', sub:'holds '+[10,20,35,55,80][save.storageTier]+' fish',
+  { key:'storageTier', name:'A Bigger Ice Cellar', sub:'holds '+[10,20,35,55,80][save.storageTier]+' fish now',
     cost:[25,45,70,100][save.storageTier]!=null?[25,45,70,100][save.storageTier]:null, gated:false,
-    effect:'Keep up to '+[10,20,35,55,80][save.storageTier]+' surplus fish per season; the rest spoil.',
+    effect:[25,45,70,100][save.storageTier]!=null?('Raises your cellar from '+[10,20,35,55,80][save.storageTier]+' to '+[10,20,35,55,80][save.storageTier+1]+' fish a season, so more of the catch sells before the rest spoil.'):'Holds all the fish you can land.',
     teach:'A bigger cellar banks more of the surplus you land before it spoils. The reward you can keep is its value, and value past what you can hold is simply lost.' },
-  { key:'adTier', name:'The Criers', sub:(1+0.3*save.adTier).toFixed(1)+'x on surplus',
+  { key:'adTier', name:'The Criers', sub: save.adTier>0?('fish sell at '+(1+0.3*save.adTier).toFixed(1)+'x now'):'no boost yet',
     cost:[30,55,90][save.adTier]!=null?[30,55,90][save.adTier]:null, gated:false,
-    effect:'Surplus fish sell for '+(1+0.3*save.adTier).toFixed(1)+'x their usual coin.',
+    effect:[30,55,90][save.adTier]!=null?('Raises what each fish fetches from '+(1+0.3*save.adTier).toFixed(1)+'x to '+(1+0.3*(save.adTier+1)).toFixed(1)+'x.'):'Fish already sell for all the market will give.',
     teach:'Criers call your catch through the market so each fish sells for more. Money is your own reward for keeping the lamp honest, and this raises how much that reward is worth.' },
 ];
   // during the tutorial rebuild, the chandlery shows only what you need to get started: boats to rebuild the fleet, and the newspaper.
@@ -753,8 +756,8 @@ function newGame(idx){
         // ONBOARDING (Season 1 only): reveal the HUD one piece per night. Keyed to the level, NOT a persisted flag,
         // so it runs on every Season-1 play (a replay used to dump everything at once once uiTaught had been saved).
         onboard:(L.id===1), coach:null,
-        reveal:(L.id===1? {cs:false,us:false,cr:false,intro:false,boats:false,catch:false,squalls:false,meter:false,musterTaught:false}
-                        : {cs:true,us:true,cr:true,intro:true,boats:true,catch:true,squalls:true,meter:true,musterTaught:true}),
+        reveal:(L.id===1? {cs:false,us:false,cr:false,intro:false,boats:false,catch:true,squalls:false,meter:false,musterTaught:false,catchTaught:false}
+                        : {cs:true,us:true,cr:true,intro:true,boats:true,catch:true,squalls:true,meter:true,musterTaught:true,catchTaught:true}),
         pools:{ calm:SKYPOOL.calm.slice(), mid:SKYPOOL.mid.slice(), heavy:SKYPOOL.heavy.slice(),
                 bLo:BARKS.lo.slice(), bMd:BARKS.md.slice(), bHi:BARKS.hi.slice(), bMiss:BARKS.miss.slice() } };
   if(L.decoyNights){
@@ -779,7 +782,7 @@ function rollNight(){
         : 'Read the dial and the line just below to judge the storm. ')
         + 'And that bar is the crew’s trust in your lamp, the poll you paid the newspaper for. It sits low, because the last keeper burned through it. Light the lamp only when a storm is really coming, and over the nights it will climb.'; }
     else if(G.night===2 && !r.boats){ r.boats=true; r.squalls=true; G.coach='New up top: your boats, and the big storms the almanac expects this season. The boats are the whole town’s living, so if you lose every one, the season is over. Warn the crew at the right times and you keep them and their boats safe.'; }
-    else if(G.night===3 && !r.catch){ r.catch=true; G.coach='New up top: your fish. On a calm night the crew sail out and land fish, and every fish sells for a little money, shown right there beside the count. It is not much at first, and your ice cellar only holds so many before the rest spoil. That money is your reward for keeping the lamp honest, and you carry it to the chandlery between seasons to catch more and earn more. So do not warn them for no reason, or you lose both their trust and the fish.'; }
+    else if(G.night===3 && !r.catchTaught){ r.catchTaught=true; G.coach='That bar up top is your fish. On a calm night the crew sail out and land fish, and every fish sells for a little money, shown right there beside the count. It is not much at first, and your ice cellar only holds so many before the rest spoil. That money is your reward for keeping the lamp honest, and you carry it to the chandlery between seasons to catch more and earn more. So do not warn them for no reason, or you lose both their trust and the fish.'; }
     else if(G.night===4 && !r.musterTaught){ r.musterTaught=true; if(!TESTMODE){ save.uiTaught=true; saveProgress(); } G.coach='Tonight the harbormaster calls a muster. This is how you earn their trust: she wants your read before the crew turns out. If you lit the lamp right now, would they heed it and stay in? Look at the trust bar. Above the line they come in, below it they sail past. Read them right on most of the season’s musters and you will have proven the trust is real.'; }
   }
   const L=G.lev, last = G.night===L.nights;
@@ -897,8 +900,8 @@ function decide(arg){
       moored = binom(CONFIG.crewN, heedProb(blend,thresh)); heedNow = moored>=4;
       G.moored=moored; G.mooredHistory.push(moored);
       if(storm){ dTrust = L.aBlur*(100-G.trust); dVMinus = L.aBlur*(100-G.vMinus); kind='hit';
-        if(heedNow){ head='Both lights, and a storm.'; body=moored+' of seven made the harbor fast, and the storm passed over empty water. But they moored to the pair of lights, not to yours alone.'; }
-        else { lostBoat=true; G.boats=Math.max(0,G.boats-1); head='Both lights, and a storm.'; body='Only '+moored+' of seven moored, and a boat that sailed past the two lights is gone.'; } }
+        if(heedNow){ head='Both lights, and a storm.'; body='The storm passed over empty water and '+crewWord(moored)+' made the harbor fast, but they moored to the pair of lights, not to yours alone.'; }
+        else { lostBoat=true; G.boats=Math.max(0,G.boats-1); head='Both lights, and a storm.'; body='With two lights burning, '+crewWord(moored)+' moored, and a boat that sailed past them is gone.'; } }
       else { dTrust = -L.aBlurCalm*G.trust; dVMinus = -L.aBlurCalm*G.vMinus; kind='coFa';
         head='Both lights, no storm.'; body='You lit your lamp beside Sefu’s and no storm came. With two lights burning, the crew cannot tell which one to stop believing.'; }
     } else {
@@ -909,7 +912,7 @@ function decide(arg){
         head='A storm slipped in.'; body='Sefu’s lantern was never a warning, and a boat was caught out with your lamp dark.'; }
       else { kind='decoyClear'; earned=CONFIG.catchPerNight; G.catch+=earned;
         dVMinus = -L.aDecoyExt*(G.vMinus - L.decoyFloor);
-        head='Sefu’s light alone.'; body=dm+' of seven turned for Sefu’s lantern, then went back to the banks when no storm came. His light is learning to mean nothing.'; }
+        head='Sefu’s light alone.'; body='When no storm came, '+crewWord(dm)+' had turned for Sefu’s lantern and then went back to the banks. His light is learning to mean nothing.'; }
     }
     G.crewOut = !(lit && heedNow);
   } else {
@@ -919,14 +922,14 @@ function decide(arg){
     G.crewOut = !(lit && heedNow);
     if(lit && storm){
       dTrust = CONFIG.aRight*(100-G.trust); kind='hit';
-      if(heedNow){ head='The lamp held.'; body=moored+' of the seven made the harbor fast on your word, and the storm tore through empty water. They put a little more in the light.'; }
+      if(heedNow){ head='The lamp held.'; body='On your word, '+crewWord(moored)+' made the harbor fast, and the storm tore through empty water. They put a little more in the light.'; }
       else { lostBoat=true; G.boats=Math.max(0,G.boats-1); head='Right, but not yet believed.';
-        body='Your lamp was up and the storm came just as it promised, but only '+moored+' of seven moored. A boat that sailed past your warning is gone. They will remember the light was right.'; }
+        body='Your lamp was up and the storm came just as it promised, but '+crewWord(moored)+' moored, and a boat that sailed past your warning is gone. They will remember the light was right.'; }
     } else if(lit && !storm){
       dTrust = -(L.aWolf!=null?L.aWolf:CONFIG.aWolf)*G.trust; kind='fa'; head='A false alarm.';
       if(!heedNow){ earned=Math.round(CONFIG.catchPerNight*(CONFIG.crewN-moored)/CONFIG.crewN); G.catch+=earned; }   // the crew who ignored the warning still fished the calm night, and that catch still sells
-      body = heedNow ? (moored+' of seven held in port on your word, and nothing came. Cry wolf too often and the belief you are building drains away.')
-                     : ('You lit the lamp on a calm night, but only '+moored+' of seven paid it mind. The rest fished and came home full, while the belief you had thins again.');
+      body = heedNow ? ('On your word, '+crewWord(moored)+' held in port, and nothing came. Cry wolf too often and the belief you are building drains away.')
+                     : ('You lit the lamp on a calm night, and '+crewWord(moored)+' paid it mind while the rest fished and came home full, and the belief you had thins again.');
     } else if(!lit && storm){
       dTrust = -CONFIG.aMiss*G.trust; kind='miss'; lostBoat=true; G.boats=Math.max(0,G.boats-1);
       head='A storm, and no warning.'; body='You left the lamp dark and a storm caught the fleet at sea. A boat is lost, and the crew marks that the light said nothing.';
@@ -1214,7 +1217,7 @@ function nightLogTable(){
   }
   const rlbl={hit:'right',fa:'cried wolf',miss:'missed',cr:'fished',coFa:'both lit',decoyClear:'stood clear'};
   const row=e=>'<tr><td>'+e.n+'</td><td>'+(e.sky==null?'·':Math.round(e.sky*100))+'</td><td>'+(e.storm?'⛈':'·')+'</td><td>'+(e.lit?'🔦':'·')+'</td><td>'+(e.moored==null?'·':e.moored+'/7')+'</td><td>'+(rlbl[e.kind]||'·')+'</td></tr>';
-  return '<table class="nlog"><tr><th>night</th><th>glass</th><th>storm</th><th>lamp</th><th>moored</th><th>result</th></tr>'+G.nightLog.map(row).join('')+'</table>';
+  return '<table class="nlog"><tr><th>night</th><th>glass</th><th>storm</th><th>lamp</th><th>crew in</th><th>result</th></tr>'+G.nightLog.map(row).join('')+'</table>';
 }
 function renderDecision(){
   $('wrap').classList.add('playing');
@@ -1373,8 +1376,8 @@ function renderDecision(){
     const o=G.outcome;
     if(G.beat===1){
       nextRow.hidden=true; $('fieldnote').hidden=true;
-      cl.innerHTML='<b>The dock answers first.</b> '+(o.moored!=null? '<b>'+o.moored+' of the seven</b> crews moor under your light (the conditioned response). The rest slip past it.'
-        : o.decoyMoored!=null? '<b>'+o.decoyMoored+' of the seven</b> crews turn for Sefu’s lantern. The rest read the sky for themselves.' : '');
+      cl.innerHTML='<b>The dock answers first.</b> '+(o.moored!=null? '<b>'+ucFirst(crewWord(o.moored))+'</b> moor under your light (the conditioned response), and the rest slip past it.'
+        : o.decoyMoored!=null? '<b>'+ucFirst(crewWord(o.decoyMoored))+'</b> turn for Sefu’s lantern, and the rest read the sky for themselves.' : '');
       return;
     }
     nextRow.hidden=false;
@@ -1423,12 +1426,12 @@ function renderBelief(){
   $('bFill').style.width=G.trust+'%';
   $('bHeed').style.left=thr+'%';
   const lm=G.mooredHistory.length? G.mooredHistory[G.mooredHistory.length-1] : null;
-  $('bNote').textContent = lm!=null? ('last lit night: '+lm+'/7 moored') : '';
+  $('bNote').textContent = lm!=null? ('last lit night: '+lm+' of 7 crew moored') : '';
   const r2=$('bRow2');
   if(L.id===3){ r2.hidden=false; $('bFill2').style.width=G.vMinus+'%'; $('bHeed2').style.left=thr+'%';
     r2.querySelector('.blab').textContent='Their belief in Sefu’s lantern';
     const ld=G.decoyMooredHistory.length? G.decoyMooredHistory[G.decoyMooredHistory.length-1] : null;
-    $('bNote2').textContent = ld!=null? ('stood alone: '+ld+'/7 turned') : '';
+    $('bNote2').textContent = ld!=null? ('stood alone: '+ld+' of 7 crew turned') : '';
     $('bHint').innerHTML = G.vMinus>=thr
       ? 'The two lights are still blurred. Keep your tower dark on Sefu’s nights so his light loses its hold.'
       : 'They can tell your lamp from Sefu’s now. Hold that apart through the Deep.';
@@ -1553,13 +1556,15 @@ function renderOverlay(){
         <button class="btn" id="bStart" type="button">${L.id===1?'Light the first night':'Begin the season'}</button>
         ${save.tutDone?'<button class="btn" id="bShop" type="button" style="background:linear-gradient(180deg,#caa24a,#9a7b2e);margin-left:8px">The shop</button>':''}
         ${levelIdx>0?'<button class="btn" id="bPrev" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">◀ Earlier season</button>':''}
-        ${levelIdx<LEVELS.length-1?'<button class="btn" id="bFwd" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">Later season ▶</button>':''}
+        ${levelIdx<maxUnlocked
+          ?'<button class="btn" id="bFwd" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px">Later season ▶</button>'
+          :(levelIdx<LEVELS.length-1?'<button class="btn" id="bFwdLock" type="button" disabled style="background:linear-gradient(180deg,#8a96a3,#6c7884);margin-left:8px;opacity:.45;cursor:not-allowed">🔒 Win to unlock</button>':'')}
       </div>
-      <p class="small" style="margin-top:10px;color:#7a7282">Every season stands on its own, so you can jump to any of the four from here.${(save.tutDone||maxUnlocked>0)?' &nbsp;·&nbsp; <a href="#" id="bReset" style="color:#9a6a4a">Start over from the beginning</a>':''}</p>`;
+      <p class="small" style="margin-top:10px;color:#7a7282">Bring a season through to a win and the next one opens.${(save.tutDone||maxUnlocked>0)?' &nbsp;·&nbsp; <a href="#" id="bReset" style="color:#9a6a4a">Start over from the beginning</a>':''}</p>`;
     $('bStart').onclick=startLevel;
     if($('bShop')) $('bShop').onclick=()=>{ state='shop'; renderOverlay(); };
     if($('bPrev')) $('bPrev').onclick=()=>{ levelIdx=Math.max(0,levelIdx-1); renderOverlay(); };
-    if($('bFwd')) $('bFwd').onclick=()=>{ levelIdx=Math.min(LEVELS.length-1,levelIdx+1); renderOverlay(); };
+    if($('bFwd')) $('bFwd').onclick=()=>{ levelIdx=Math.min(maxUnlocked,levelIdx+1); renderOverlay(); };
     if($('bReset')) $('bReset').onclick=(e)=>{ e.preventDefault(); armReset($('bReset')); };
     return;
   }
@@ -1568,7 +1573,9 @@ function renderOverlay(){
   const titles={ win:'The fleet came home', boats:'The harbor is empty', deep:'The Deep took them', hungry:'A hungry winter', misread:'You never knew the crew', mercy:'The season turns without you', decoy:'They followed the wrong light', weak:'They stood frozen at the rail', superstition:'A ritual that saved no one' };
   const missed=G.stats.miss;
   const leads={
-    win:'You brought the crew through to the lowest tide, and when the Deep rose they trusted the lamp enough to stay ashore, and they had fished the calm nights well enough to see the town through the winter.',
+    win: opv
+      ? 'You brought the crew through to the lowest tide, and when the Deep rose they ran the drill on their own, without a word from you, and they had fished the calm nights well enough to see the town through the winter.'
+      : 'You brought the crew through to the lowest tide, and when the Deep rose they trusted the lamp enough to stay ashore, and they had fished the calm nights well enough to see the town through the winter.',
     boats:'You ran out of boats before the season turned. Too many nights the crew was caught out on the water.',
     deep:'You reached the last night, but the crew had not learned to believe the lamp in time, and when the Deep rose they were out on the water. A warning is only ever worth the belief behind it.',
     hungry:'You kept the boats safe, but the crew spent too many good nights ashore, and the town went into winter without enough catch. Warning on a calm night costs you even when no one drowns.',
@@ -1603,7 +1610,9 @@ function renderOverlay(){
   const outImg = won ? 'bg_dawn.webp' : (['deep','superstition','weak','decoy'].indexOf(why)>=0 ? 'deep.webp' : 'bg_storm.webp');
   const lossLead = opv
     ? 'What you were building, and ran short of, is a drill the crew would run on their own. '
-    : 'What you were building, and ran short of, is the crew’s learned trust in the lamp. ';
+    : L.id===3 ? 'What you were building, and ran short of, is the crew learning to tell your lamp from Sefu’s lantern. '
+    : L.id===2 ? 'What you could not keep alive, across the long calm, is the crew’s trust in the lamp. '
+    : 'What you were building, and ran short of, is the crew’s trust in the lamp. ';
   const youWatched = opv
     ? 'You watched the drill readiness climb as you rewarded the crew for the thing you wanted, and the idle ritual climb on the nights you rewarded them for nothing in particular. A behavior grows when it pays and fades when it stops paying, and the whole season was you deciding, night by night, which behavior to feed.'
     : 'You watched that belief rise and fall as you conditioned the crew, and you bet on it each time the harbormaster called a muster. In a real study the strength behind a learned response is invisible, inferred only from behavior like the mooring on the dock; here you got to watch the very thing that is normally hidden.';
