@@ -648,8 +648,10 @@ function renderShop(){
     <div class="shopgrid">${cards}</div>
     <div style="margin-top:12px"><button class="btn" id="bShopBack" type="button">⚓ Back to the harbor</button></div>`;
   overlay.querySelectorAll('[data-buy]').forEach(b=> b.onclick=()=>buyItem(b.getAttribute('data-buy')));
-  $('bShopBack').textContent = (_shopReturn==='tutorial') ? 'Done. Set sail ▸' : '⚓ Back to the harbor';
-  $('bShopBack').onclick=()=>{ if(_shopReturn==='tutorial'){ _shopReturn=null; save.pollTier=Math.max(1,save.pollTier); saveProgress(); tutIx++; state='tutorial'; renderTutorial(); } else { state='menu'; renderOverlay(); } };
+  const _tut = (_shopReturn==='tutorial');   // in the tutorial you must actually buy the Gazette to sail; nothing is handed to you for free
+  $('bShopBack').textContent = _tut ? (save.pollTier>=1 ? 'Done. Set sail ▸' : 'Buy the newspaper first') : '⚓ Back to the harbor';
+  $('bShopBack').disabled = _tut && save.pollTier<1;
+  $('bShopBack').onclick=()=>{ if(_tut){ if(save.pollTier<1) return; _shopReturn=null; saveProgress(); tutIx++; state='tutorial'; renderTutorial(); } else { state='menu'; renderOverlay(); } };
   updateCoins();
 }
 /* ============================ THE TUTORIAL (Season 1 prologue: "Earn the Lamp") ============================ */
@@ -706,7 +708,7 @@ function renderTutorial(){
 function tutAct(b){
   audioOn();
   if(b.act==='shop'){ _shopReturn='tutorial'; state='shop'; renderShop(); return; }
-  if(b.act==='begin'){ save.tutDone=true; save.pollTier=Math.max(1,save.pollTier); saveProgress(); levelIdx=0; startLevel(); return; }
+  if(b.act==='begin'){ save.tutDone=true; saveProgress(); levelIdx=0; startLevel(); return; }
   tutIx++; renderTutorial();
 }
 /* ============================ STATE ============================ */
