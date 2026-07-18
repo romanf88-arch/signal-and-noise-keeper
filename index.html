@@ -464,7 +464,7 @@ const LEVELS = [
     objective:'Earn the crew’s trust. Warn them only when a storm is truly coming, so your lamp comes to mean danger and they learn to heed it. Read them right at the musters to show the trust is real, and it will hold when the Deep comes.',
     back:null,
     nights:14, deckStorms:5, strata:[[1,4,1],[5,9,3],[10,13,1]],   // [fromNight,toNight,storms]
-    startTrust:26, heedThreshold:50, catchTarget:40, catchGoal:false, aWolf:0.14, minFleet:7, startBoats:7, decay:0, quiet:null,
+    startTrust:26, heedThreshold:50, catchTarget:40, catchGoal:false, aWolf:0.14, minFleet:6, startBoats:7, decay:0, quiet:null,
     musterNights:[4,6,8,11,13], musterNeed:3,
     almanac:'Marisol, at the season’s first tide: “The almanac promises five great squalls, and after them the Deep.”',
     story:{ era:'St. Petersburg, the 1900s',
@@ -529,7 +529,7 @@ function drillEmit(R,S,L){ const g=L.emitGamma, k=L.emitK; const rp=Math.pow(Mat
 let levelIdx=0, maxUnlocked=0;
 // persistent save: the harbor economy + progress, as one versioned JSON blob. Migrates the old bare keeperMax once.
 const SAVE_V = 2;   // bump this when the save shape changes; older saves are wiped so the new intro runs fresh
-function defaultSave(){ return { v:SAVE_V, money:0, hulls:5, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, maxUnlocked:0, tutDone:false, uiTaught:false }; }
+function defaultSave(){ return { v:SAVE_V, money:0, hulls:1, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, maxUnlocked:0, tutDone:false, uiTaught:false }; }
 let save = defaultSave();
 try{
   const raw = localStorage.getItem('keeperSave');
@@ -556,7 +556,7 @@ function computePayout(){
 function updateCoins(){ const c=$('coins'), v=$('coinVal'); if(!c||!v) return; v.textContent=save.money; c.hidden=!(save.money>0 || save.tutDone); }
 // THE CHANDLERY: every item sharpens perception, protects the fleet, or raises the wage. None buys the crew's
 // belief in the lamp -- that is earned, not bought. Each carries a one-line lesson tying it to a real idea.
-function shopItems(){ return [
+function shopItems(){ const all = [
   { key:'pollTier', name:'The Gazette', sub: save.pollTier>=1?'a weekly poll':'not yet subscribed',
     cost: save.pollTier<1?15:null, gated:false,
     effect: save.pollTier>=1?'You can read the crew’s belief on the meter.':'Reveals the belief meter, a read on how far the crews trust your lamp.',
@@ -579,7 +579,10 @@ function shopItems(){ return [
     cost:[30,55,90][save.adTier]!=null?[30,55,90][save.adTier]:null, gated:false,
     effect:'Surplus fish sell for '+(1+0.3*save.adTier).toFixed(1)+'x their usual coin.',
     teach:'Criers call your catch through the market so each fish sells for more. Money is your own reward for keeping the lamp honest, and this raises how much that reward is worth.' },
-]; }
+];
+  // during the tutorial rebuild, the chandlery shows only what you need to get started: boats to rebuild the fleet, and the newspaper.
+  return (_shopReturn==='tutorial') ? all.filter(it=>it.key==='hulls'||it.key==='pollTier') : all;
+}
 function buyItem(key){
   const it = shopItems().find(x=>x.key===key);
   if(!it || it.cost==null || it.gated || save.money < it.cost) return;
@@ -600,8 +603,8 @@ const BUY_DLG = {
     { who:'marisol', line:"That's what a good instrument buys you: sensitivity. A sharper tool makes it easier to tell a real signal from random noise. It's the same skill a radar operator or a doctor reading an x-ray spends years training." },
   ],
   hulls: [
-    { who:'marisol', line:"An extra boat. Now if you guess wrong and one gets caught out in a storm, it isn't the end of you. You can afford a mistake or two." },
-    { who:'marisol', line:"And that should change how you play. When a wrong call is cheap, you can risk letting them fish on an iffy night. When it's expensive, you warn more. How much a mistake costs you is what decides how careful to be." },
+    { who:'marisol', line:"Another boat back on the water. It cost you now, but it will fish for you every calm night from here on, and that catch is money in your pocket season after season. Spend a little today to earn more tomorrow. That trade is the whole idea behind investing." },
+    { who:'marisol', line:"A bigger fleet changes how you play, too. When you have boats to spare, losing one to a storm is not the end of you, so you can let them fish on an iffy night. How much a mistake would cost is exactly what should decide how careful to be." },
   ],
   storageTier: [
     { who:'marisol', line:"A bigger ice cellar. Now you can keep more of the extra fish before they spoil, and that's more money when the season ends." },
@@ -645,7 +648,7 @@ function renderShop(){
     <div style="margin-top:12px"><button class="btn" id="bShopBack" type="button">⚓ Back to the harbor</button></div>`;
   overlay.querySelectorAll('[data-buy]').forEach(b=> b.onclick=()=>buyItem(b.getAttribute('data-buy')));
   $('bShopBack').textContent = (_shopReturn==='tutorial') ? 'Done. Set sail ▸' : '⚓ Back to the harbor';
-  $('bShopBack').onclick=()=>{ if(_shopReturn==='tutorial'){ _shopReturn=null; save.pollTier=Math.max(1,save.pollTier); saveProgress(); tutIx++; state='tutorial'; renderTutorial(); } else { state='menu'; renderOverlay(); } };
+  $('bShopBack').onclick=()=>{ if(_shopReturn==='tutorial'){ _shopReturn=null; save.pollTier=Math.max(1,save.pollTier); save.hulls=Math.max(6,save.hulls||1); saveProgress(); tutIx++; state='tutorial'; renderTutorial(); } else { state='menu'; renderOverlay(); } };
   updateCoins();
 }
 /* ============================ THE TUTORIAL (Season 1 prologue: "Earn the Lamp") ============================ */
@@ -664,16 +667,18 @@ const TUT=[
   { who:'marisol', line:"Let me tell you why it works this way. Have you heard of Pavlov? He was a scientist who rang a bell right before he fed his dogs, every single time." },
   { who:'marisol', link:true, line:"After a while, the dogs started drooling the moment they heard the bell, before any food showed up. The bell had come to mean food is coming." },
   { who:'marisol', line:"Your lamp is the same. Right now it means nothing to them. But if you only light it when a storm is really coming, over and over, they will learn that the lamp means danger. Then they come in every time you light it." },
-  { who:'marisol', act:'salary', line:"That takes time, and time takes money. Here is your first paycheck. It is not much, twenty dollars, but it is a start." },
-  { who:'marisol', act:'shop', line:"Take it to the shop next door. Most of it you cannot afford yet. But you can buy the newspaper, which polls the fishermen so you can see how much they trust you. Get that one." },
-  { who:'marisol', act:'begin', line:"Good, the paper is yours now. From your very first night it will show you how much the crews trust your lamp. Now go read the sky, warn them true, and keep this town fed." },
+  { who:'marisol', line:"One last thing the old keeper wrecked: the fleet. He never called the storms, so boat after boat went down, until the whole town had a single boat left. That one is tied up at your dock right now." },
+  { who:'marisol', act:'salary', line:"But the town is not done for. They pooled the savings they had and put the purse in your hands, to get boats back on the water. Every boat you buy goes out and fishes, season after season. It costs you now and pays you back slowly, and that patience is how anything worth having gets built." },
+  { who:'marisol', act:'shop', line:"Take it to the chandlery. Rebuild the fleet as far as the money goes, and pick up the newspaper too, so you can read how much the crew trust you." },
+  { who:'marisol', act:'begin', line:"Good. A real fleet under you, and a paper to read the crew. Now go earn their trust, warn them true, and put this town back on its feet." },
 ];
 function startTutorial(){ state='tutorial'; tutIx=0; tutStorm=false; _shopReturn=null;
-  save.money=0; save.pollTier=0; G=null; overlayWrap.hidden=false; showBgVideo(false); renderTutorial(); }
+  save.money=0; save.pollTier=0; save.hulls=1; save.instrTier=0; save.storageTier=0; save.adTier=0;   // a ruined town: one boat, nothing bought yet
+  G=null; overlayWrap.hidden=false; showBgVideo(false); renderTutorial(); }
 function renderTutorial(){
   const b=TUT[tutIx]; if(!b){ save.tutDone=true; saveProgress(); levelIdx=0; startLevel(); return; }
   tutStorm=!!b.storm;
-  if(b.act==='salary' && save.money<20){ save.money=20; saveProgress(); }   // the money appears in the counter as she hands it over
+  if(b.act==='salary' && save.money<150){ save.money=150; saveProgress(); }   // the town's rebuild fund appears in the counter as she hands it over
   overlayWrap.hidden=false; overlayWrap.classList.add('titlescreen'); overlay.style.cssText='background:transparent;border:none;box-shadow:none;padding:0;max-width:none;max-height:none;overflow:visible'; updateCoins();
   const fig=(w,cls)=> '<img class="vn-fig '+cls+'" src="assets/portrait_'+w+'.webp" alt="'+(TUT_NAMES[w]||w)+'" onerror="this.style.display=\'none\'">';
   const link = b.link? '<a class="vn-link" href="'+LEVELS[0].story.url+'" target="_blank" rel="noopener">Read the real story of Pavlov and his dogs ↗</a>':'';
