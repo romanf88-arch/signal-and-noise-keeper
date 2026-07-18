@@ -564,7 +564,7 @@ function shopItems(){ const all = [
   { key:'pollTier', name:'The Gazette', sub: save.pollTier>=1?'a weekly poll':'not yet subscribed',
     cost: save.pollTier<1?15:null, gated:false,
     effect: save.pollTier>=1?'You can read the crew’s belief on the meter.':'Reveals the belief meter, a read on how far the crews trust your lamp.',
-    teach:'You cannot see trust directly, so you pay for a poll that measures it. Turning a hidden idea into a number you can track is what psychologists call operationalizing it.' },
+    teach:'You cannot see trust, so you pay for a poll that puts a number on it. Measuring a hidden thing through something you can count is what psychologists call operationalizing it.' },
   { key:'instrTier', name:['The Barometer','A Finer Glass','A Radar Set','Your Radar'][save.instrTier],
     sub:'you have '+['no instrument yet','a barometer','a finer glass','a radar'][save.instrTier],
     cost:[40,70,110][save.instrTier]!=null?[40,70,110][save.instrTier]:null,
@@ -574,11 +574,11 @@ function shopItems(){ const all = [
   { key:'hulls', name:'Another Boat', sub: save.hulls+(save.hulls===1?' boat in your fleet':' boats in your fleet'),
     cost: save.hulls<8? (20 + 10*(save.hulls-1)) : null, gated:false,   // each boat costs more than the last
     effect: 'Adds a boat, bringing your fleet to '+(save.hulls+1)+'. Each boat you buy costs more than the last. If you lose them all in one season, the season is over.',
-    teach:'With more boats, losing one to a storm hurts less. And how much a mistake costs you is exactly what should decide how careful you are about warning.' },
+    teach:'With more boats, losing one to a storm hurts less. The more a wrong call would cost you, the more careful you should be, and a deep fleet makes each wrong call cheaper.' },
   { key:'storageTier', name:'A Bigger Ice Cellar', sub:'holds '+[10,20,35,55,80][save.storageTier]+' fish now',
     cost:[25,45,70,100][save.storageTier]!=null?[25,45,70,100][save.storageTier]:null, gated:false,
     effect:[25,45,70,100][save.storageTier]!=null?('Raises your cellar from '+[10,20,35,55,80][save.storageTier]+' to '+[10,20,35,55,80][save.storageTier+1]+' fish a season, so more of the catch sells before the rest spoil.'):'Holds all the fish you can land.',
-    teach:'A bigger cellar banks more of the surplus you land before it spoils. The reward you can keep is its value, and value past what you can hold is simply lost.' },
+    teach:'A bigger cellar keeps more of the fish you land before they spoil. Fish you cannot store are worth nothing, so a reward only counts if you can actually hold onto it.' },
   { key:'adTier', name:'The Criers', sub: save.adTier>0?('fish sell at '+(1+0.3*save.adTier).toFixed(1)+'x now'):'no boost yet',
     cost:[30,55,90][save.adTier]!=null?[30,55,90][save.adTier]:null, gated:false,
     effect:[30,55,90][save.adTier]!=null?('Raises what each fish fetches from '+(1+0.3*save.adTier).toFixed(1)+'x to '+(1+0.3*(save.adTier+1)).toFixed(1)+'x.'):'Fish already sell for all the market will give.',
@@ -1382,7 +1382,7 @@ function renderDecision(){
       cl.innerHTML = G.finale
         ? '<b>The lowest tide of the year. The water has gone wrong, and the glass shows nothing.</b><br>There is no storm to read tonight. Read the trust bar instead'+(G.isDecoy?', and whether the crew can still tell your lamp from Sefu’s':'')+': above the line, they trust the lamp enough to heed it blind. Ring the bell to call them in, or wave the fleet out.'
         : askDecoy
-          ? '<div style="text-align:center">'+face+'<div>And Sefu’s lantern. <b>If only that burned tonight, would the crew turn for it too?</b> Go by what the dock has shown you, not by what you hope they have learned.</div></div>'
+          ? '<div style="text-align:center">'+face+'<div>Now Sefu’s lantern. <b>If only his lantern were lit tonight, and not your lamp, would the crew still turn for it?</b> Go by what the dock has shown you, not by what you hope they have learned.</div></div>'
           : '<div style="text-align:center">'+face+'<div>'+(G.isDecoy?'The harbormaster wants two reads before the night turns. First, the tower lamp: ':'The harbormaster wants your read before the night turns. ')+'<b>If the lamp burned tonight, would the crew heed it and stay in?</b> Read the belief you have built.'+mstake+'</div></div>';
       announce(G.finale?'The night of the Deep. Ring the bell, or wave the fleet out?': askDecoy?'And Sefu’s lantern. Would the crew turn for that too?':'A muster. Would the crew heed a lit lamp tonight?');
     } else {
@@ -1647,7 +1647,7 @@ function renderOverlay(){
     : 'What you were building, and ran short of, is the crew’s trust in the lamp. ';
   const youWatched = opv
     ? 'You watched the drill readiness climb as you rewarded the crew for the thing you wanted, and the idle ritual climb on the nights you rewarded them for nothing in particular. A behavior grows when it pays and fades when it stops paying, and the whole season was you deciding, night by night, which behavior to feed.'
-    : 'You watched that belief rise and fall as you conditioned the crew, and you bet on it each time the harbormaster called a muster. In a real study the strength behind a learned response is invisible, inferred only from behavior like the mooring on the dock; here you got to watch the very thing that is normally hidden.';
+    : 'You watched that belief rise and fall all season as you conditioned the crew, and you bet on it at each muster. In a real experiment, the strength of a learned response is hidden. Scientists can only infer it from what the subject does, like counting how many of the crew moored. Here you got to watch that hidden thing directly.';
   // the PROBE curve: the conditioned response measured on the cold tests (CS-alone), the salivation-to-the-bell curve
   const probeCurveSVG = (G.probeHistory && G.probeHistory.length>=2)
     ? trustCurveSVG(G.probeHistory.map(p=>Math.round(p.scramble/CONFIG.crewN*100)), 50, null, { primary:'ran to the lamp alone', threshold:'half the crew ran to the light' })
