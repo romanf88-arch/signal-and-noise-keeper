@@ -529,7 +529,7 @@ function drillEmit(R,S,L){ const g=L.emitGamma, k=L.emitK; const rp=Math.pow(Mat
 let levelIdx=0, maxUnlocked=0;
 // persistent save: the harbor economy + progress, as one versioned JSON blob. Migrates the old bare keeperMax once.
 const SAVE_V = 2;   // bump this when the save shape changes; older saves are wiped so the new intro runs fresh
-function defaultSave(){ return { v:SAVE_V, money:0, hulls:1, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, maxUnlocked:0, tutDone:false, uiTaught:false }; }
+function defaultSave(){ return { v:SAVE_V, money:0, hulls:1, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, maxUnlocked:0, tutDone:false, uiTaught:false, coachedLoss:false }; }
 let save = defaultSave();
 try{
   const raw = localStorage.getItem('keeperSave');
@@ -543,15 +543,16 @@ function saveProgress(){ save.maxUnlocked=maxUnlocked; try{ localStorage.setItem
 const ECON = { WAGE_BASE:20, MUSTER_COIN:4, HULL_COIN:3, FISH_COIN:2, storageCaps:[10,20,35,55,80] };
 function storageCap(){ return ECON.storageCaps[Math.min(ECON.storageCaps.length-1, save.storageTier||0)]||10; }
 function adMult(){ return 1 + 0.3*(save.adTier||0); }
-function computePayout(){
-  const L=G.lev, tgt=L.catchTarget||0;
-  const surplus = Math.max(0, (G.catch||0) - tgt);
-  const sold = Math.min(surplus, storageCap());
+function computePayout(won){
+  const cap = storageCap();
+  const sold = Math.min(G.catch||0, cap);              // the season's catch sells every run, win or lose (up to what you can store)
+  const fishCoin = Math.round(sold*ECON.FISH_COIN*adMult());
+  const spoiled = Math.max(0,(G.catch||0)-cap);
+  if(won===false) return { wage:0, musterCoin:0, hullCoin:0, fishCoin, sold, spoiled, total: fishCoin };   // a lost season still earns the fish money
   const wage = Math.round(ECON.WAGE_BASE*(1 + 0.3*levelIdx));
   const musterCoin = ECON.MUSTER_COIN*(G.musterRight||0);
   const hullCoin = ECON.HULL_COIN*(G.boats||0);        // boats brought home: reward for warning well
-  const fishCoin = Math.round(sold*ECON.FISH_COIN*adMult());
-  return { wage, musterCoin, hullCoin, fishCoin, sold, spoiled:Math.max(0,surplus-sold), total: wage+musterCoin+hullCoin+fishCoin };
+  return { wage, musterCoin, hullCoin, fishCoin, sold, spoiled, total: wage+musterCoin+hullCoin+fishCoin };
 }
 function updateCoins(){ const c=$('coins'), v=$('coinVal'); if(!c||!v) return; v.textContent=save.money; c.hidden=!(save.money>0 || save.tutDone); }
 // THE CHANDLERY: every item sharpens perception, protects the fleet, or raises the wage. None buys the crew's
@@ -1153,7 +1154,7 @@ function proceed(){ if(state!=='resolved') return;
 }
 function nextNight(){ proceed(); }
 function endGame(won,reason){ state = won?'won':'lost'; G.endReason=reason||(won?'win':'boats');
-  if(won){ G.payout=computePayout(); if(!TESTMODE){ save.money += G.payout.total; } }   // banked only on a win, never in the battery
+  G.payout=computePayout(won); if(!TESTMODE){ save.money += G.payout.total; saveProgress(); }   // every run banks the fish money; a win adds wage + bonuses. never in the battery
   (won?snd.good:snd.bad)(); if(!playSnd('foghorn',0.5)) snd.foghorn(); playSnd('page_turn',0.35); renderOverlay(); }
 /* ============================ UI RENDER (DOM) ============================ */
 const $=id=>document.getElementById(id);
@@ -1602,6 +1603,8 @@ function renderOverlay(){
     visual:probeCurveSVG,
     body:`<p>Each point is a <b>cold test</b>: the lamp raised over a flat, calm sea, counting how many of the seven crew still broke for the harbor at the signal alone. ${L.decay ? 'Watch it fall. As the lamp stopped meaning a storm, the response faded on its own, which is <b>extinction</b>.' : 'Watch it climb. By the end they ran from the light itself, the way they once ran from a black sky. That reflex to the signal alone, with no storm to cause it, is the <b>conditioned response</b>, the dog salivating at the bell.'}</p>` } : null;
   if(!won){
+    const pay = G.payout || computePayout(false);
+    const firstLoss = !save.coachedLoss; if(firstLoss && !TESTMODE){ save.coachedLoss=true; saveProgress(); }
     const slides=[
       { kicker:'The season turns', title:titles[why], visual:imgSlide(outImg,'the harbor'),
         body:`<p>${leads[why]}</p>` },
@@ -1612,12 +1615,16 @@ function renderOverlay(){
         body:`<p>${lossLead}${L.debrief.body}</p>${conceptMap(L)}` },
       { kicker:'The season, night by night', title:'', visual:'',
         body:`${nightLogTable()}${statline}${mirror}` },
-      { kicker:'Take it again', title:'', visual:'',
-        body:`<p>Each season is one experiment. Read the crew, spend your nights well, and the belief you build will hold when it counts.</p>`,
-        actions:`<button class="btn" id="bRetry" type="button">Take the season again</button> <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">⚓ Harbor</button>` },
+      { kicker:'Take it again', title:'', visual:imgSlide('portrait_marisol.webp','Marisol','portrait'),
+        body:`<p>The season’s catch still sold for <b>$${pay.total}</b>, so you did not come away empty-handed.</p>`
+          + (firstLoss
+            ? `<p>Marisol climbs the tower stairs and sits. “Do not take it hard. You have a little money in hand now. Take it to the chandlery and spend it, an extra boat, or the criers to make every fish worth more, then run the season again. Each thing you buy makes the next run a little easier, and that is how a keeper claws a ruined town back to its feet. No one does it in a single season.”</p>`
+            : `<p>Spend what you earned in the chandlery, a boat or better prices, then take the season again. Each upgrade makes the next run easier.</p>`),
+        actions:`<button class="btn" id="bRetry" type="button">Take the season again</button> <button class="btn" id="bShopLoss" type="button" style="background:linear-gradient(180deg,#caa24a,#9a7b2e)">Visit the chandlery</button> <button class="btn" id="bHarbor" type="button" style="background:linear-gradient(180deg,#8a96a3,#6c7884)">⚓ Harbor</button>` },
     ];
     renderSlides(slides, (ix,last)=>{ if(last){
       if($('bRetry')) $('bRetry').onclick=startLevel;
+      if($('bShopLoss')) $('bShopLoss').onclick=()=>{ state='shop'; renderOverlay(); };
       if($('bHarbor')) $('bHarbor').onclick=()=>{ state='menu'; renderOverlay(); };
     }});
     return;
@@ -1625,7 +1632,7 @@ function renderOverlay(){
   maxUnlocked=Math.max(maxUnlocked, Math.min(levelIdx+1, LEVELS.length-1)); saveProgress();
   const hasNext = levelIdx+1 < LEVELS.length;
   const sefu = (L.id===2)? `<p style="color:#6a5a2e">A peddler named Sefu has set a lantern stall on the dock. Some nights, from the water, his light looks like yours.</p>` : '';
-  const pay = G.payout || computePayout();
+  const pay = G.payout || computePayout(true);
   const winSlides=[
     { kicker:'The season turns', title:titles.win, visual:imgSlide('bg_dawn.webp','dawn over the harbor'),
       body:`<p>${leads.win}</p>${L.back?`<p style="color:#6a5a2e">${L.back}</p>`:''}` },
@@ -1637,12 +1644,12 @@ function renderOverlay(){
     { kicker:'The season, night by night', title:'', visual:'',
       body:`${nightLogTable()}${statline}${mirror}` },
     { kicker:'Payday', title:'You get paid', visual:imgSlide('coast_map.webp','the harbor'),
-      body:`<p>A safe season pays. You get your keeper's wage, a bonus for reading the crew right and for every boat you brought home, and money for the extra fish the town bought once it had enough to eat.</p>
+      body:`<p>A safe season pays. The season's catch sells at market, and on top of that you draw your keeper's wage, a bonus for reading the crew right, and a bonus for every boat you brought home.</p>
       <div class="kfacts">
+        ${pay.fishCoin? '<span class="k">catch sold +$'+pay.fishCoin+'</span>':''}
         <span class="k">wage +$${pay.wage}</span>
         <span class="k">reading the crew +$${pay.musterCoin}</span>
         <span class="k">boats saved +$${pay.hullCoin}</span>
-        ${pay.fishCoin? '<span class="k">extra fish +$'+pay.fishCoin+'</span>':''}
       </div>
       <p><b>+$${pay.total} this season.</b> You now have <b>$${save.money}</b>.${pay.spoiled? ' <span class="small">('+pay.spoiled+' fish spoiled because your ice cellar was full; a bigger one keeps more.)</span>':''}</p>
       <p class="small">Spend it at the chandlery to sharpen your read of the sky, keep more boats afloat, or measure what you cannot see.</p>` },
