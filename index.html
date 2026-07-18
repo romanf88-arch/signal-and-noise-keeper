@@ -461,11 +461,11 @@ function pickPool(pool){ if(!pool.length) return null; const i=Math.floor(rng()*
 /* ============================ LEVELS ============================ */
 const LEVELS = [
   { id:1, name:'The Keeper', term:'a conditioned signal',
-    objective:'Read the crew, not just the sky. Call at the musters whether they would heed your lamp, and be right.',
+    objective:'Earn the crew’s trust. Warn them only when a storm is truly coming, so your lamp comes to mean danger and they learn to heed it. Read them right at the musters to show the trust is real, and it will hold when the Deep comes.',
     back:null,
     nights:14, deckStorms:5, strata:[[1,4,1],[5,9,3],[10,13,1]],   // [fromNight,toNight,storms]
-    startTrust:26, heedThreshold:50, catchTarget:40, startBoats:7, decay:0, quiet:null,
-    musterNights:[4,6,8,11,13], musterNeed:4,
+    startTrust:26, heedThreshold:50, catchTarget:40, catchGoal:false, aWolf:0.14, minFleet:7, startBoats:7, decay:0, quiet:null,
+    musterNights:[4,6,8,11,13], musterNeed:3,
     almanac:'Marisol, at the season’s first tide: “The almanac promises five great squalls, and after them the Deep.”',
     story:{ era:'St. Petersburg, the 1900s',
       body:'Ivan Pavlov was studying how dogs digest their food. He noticed something strange. The dogs started to drool before any food showed up, as soon as they heard the footsteps of the man who fed them. So Pavlov tried a test. He rang a bell right before each meal, over and over. After enough meals, the bell by itself made the dogs drool, with no food in sight. A sound that used to mean nothing now meant that food was coming.',
@@ -727,7 +727,7 @@ function newGame(idx){
   const L=LEVELS[levelIdx];
   rng = mulberry32(((Math.random()*1e9)|0)||7);
   auxRng = mulberry32(((Math.random()*1e9)|0)||101);   // isolated probe/mini-game stream (never touches the deck/gauge/dock sequence)
-  G = { lev:L, night:1, boats:(isOperant(L)? L.startBoats : (save.hulls||L.startBoats)), trust:(L.startTrust!=null?L.startTrust:(L.startReadiness||0)), catch:0,
+  G = { lev:L, night:1, boats:(isOperant(L)? L.startBoats : Math.max(save.hulls||L.startBoats, L.minFleet||0)), trust:(L.startTrust!=null?L.startTrust:(L.startReadiness||0)), catch:0,
         decided:false, lit:false, outcome:null, log:[], stats:{hit:0,fa:0,miss:0,cr:0},
         weatherStorm:false, crewOut:false, sky:0, finale:false, inQuiet:false,
         isMuster:false, musterAnswered:false, musterCall:null, musterRight:0, musterCount:0, lastMuster:null,
@@ -771,8 +771,7 @@ function rollNight(){
         : 'Read the dial and the line just below to judge the storm. ')
         + 'And that bar is the crew’s trust in your lamp, the poll you paid the newspaper for. It sits low, because the last keeper burned through it. Light the lamp only when a storm is really coming, and over the nights it will climb.'; }
     else if(G.night===2 && !r.boats){ r.boats=true; r.squalls=true; G.coach='New up top: your boats, and the big storms the almanac expects this season. The boats are the whole town’s living, so if you lose every one, the season is over. Warn the crew at the right times and you keep them and their boats safe.'; }
-    else if(G.night===3 && !r.catch){ r.catch=true; G.coach='Last piece up top: your catch. The town needs enough fish to make it through winter, and the crew only land fish on the nights they sail. So you cannot warn them for no reason, or the town goes hungry. Safe in port, or out fishing: that is the whole tension.'; }
-    else if(G.night===4 && !r.musterTaught){ r.musterTaught=true; G.coach='Tonight the harbormaster calls a muster. Before the crew turns out, she wants your read: if you lit the lamp right now, would they heed it and stay in? Look at the trust bar. Above the line they come in, below it they sail past. You are predicting what they will do from the trust you have built.'; }
+    else if(G.night===4 && !r.musterTaught){ r.musterTaught=true; G.coach='Tonight the harbormaster calls a muster. This is how you earn their trust: she wants your read before the crew turns out. If you lit the lamp right now, would they heed it and stay in? Look at the trust bar. Above the line they come in, below it they sail past. Read them right on most of the season’s musters and you will have proven the trust is real.'; }
   }
   const L=G.lev, last = G.night===L.nights;
   G.finale = last;
@@ -915,7 +914,7 @@ function decide(arg){
       else { lostBoat=true; G.boats=Math.max(0,G.boats-1); head='Right, but not yet believed.';
         body='Your lamp was up and the storm came just as it promised, but only '+moored+' of seven moored. A boat that sailed past your warning is gone. They will remember the light was right.'; }
     } else if(lit && !storm){
-      dTrust = -CONFIG.aWolf*G.trust; kind='fa'; head='A false alarm.';
+      dTrust = -(L.aWolf!=null?L.aWolf:CONFIG.aWolf)*G.trust; kind='fa'; head='A false alarm.';
       body = heedNow ? (moored+' of seven held in port on your word, and nothing came. Cry wolf too often and the belief you are building drains away.')
                      : ('You lit the lamp on a calm night. Only '+moored+' of seven paid it mind, and what little belief you had thins again.');
     } else if(!lit && storm){
@@ -1131,7 +1130,7 @@ function proceed(){ if(state!=='resolved') return;
   if(G.boats<=0 && !G.finale){ endGame(false,'boats'); return; }
   if(G.finale){
     const survived = !G.crewOut && G.boats>0;
-    const fed = G.catch>=G.lev.catchTarget;
+    const fed = (G.lev.catchGoal===false) ? true : (G.catch>=G.lev.catchTarget);   // Season 1 is trust-only; fish becomes a goal from Season 2
     const readEnough = G.musterRight >= (G.lev.musterNeed||0) && G.dRight >= (G.lev.decoyNeed||0);
     let reason='win';
     if(!survived) reason = isOperant(G.lev)? (G.finaleRitualLoss?'superstition':'weak') : (G.finaleDecoyLoss? 'decoy':'deep');
@@ -1234,7 +1233,7 @@ function renderDecision(){
   $('sSquall').textContent = op? (G.rations+' of '+L.rations) : (G.stormsSpent+' / '+L.deckStorms);
   // Season 1 onboarding: HUD tiles appear one at a time (see rollNight); everything shows normally otherwise
   $('tBoats').hidden = G.onboard && !G.reveal.boats;
-  $('tCatch').hidden = G.onboard && !G.reveal.catch;
+  $('tCatch').hidden = (L.catchGoal===false) || (G.onboard && !G.reveal.catch);   // no catch goal in Season 1
   $('tSquall').hidden = G.onboard && !G.reveal.squalls;
   // catch bar
   const frac=Math.min(1,G.catch/L.catchTarget);
@@ -1325,11 +1324,12 @@ function renderDecision(){
       if(!TESTMODE && G.musterPhase===0){ $('btnRing').disabled=true; $('btnWave').disabled=true;
         const tok=++beatTok; setTimeout(()=>{ if(tok===beatTok && state==='reading'){ $('btnRing').disabled=false; $('btnWave').disabled=false; } }, CONFIG.bellMs); }
       else { $('btnRing').disabled=false; $('btnWave').disabled=false; }
+      const mstake = (!G.finale && !G.isDecoy && G.lev.musterNeed) ? '<div class="small" style="margin-top:8px;color:#f5c14e">You must read the crew right on at least <b>'+G.lev.musterNeed+' of the season’s '+G.lev.musterNights.length+'</b> musters, or you lose their trust and the season. Right so far: <b>'+G.musterRight+'</b>.</div>' : '';
       cl.innerHTML = G.finale
         ? '<b>The lowest tide of the year. The water has gone wrong, and the glass shows nothing.</b><br>Tonight there is nothing to read but the season behind you'+(G.isDecoy?', and whether the crew can still tell your lamp from Sefu’s':'')+'. Ring the bell to call them in, or wave the fleet out.'
         : askDecoy
           ? '<div style="text-align:center">'+face+'<div>And Sefu’s lantern. <b>If only that burned tonight, would the crew turn for it too?</b> Go by what the dock has shown you, not by what you hope they have learned.</div></div>'
-          : '<div style="text-align:center">'+face+'<div>'+(G.isDecoy?'The harbormaster wants two reads before the night turns. First, the tower lamp: ':'The harbormaster wants your read before the night turns. ')+'<b>If the lamp burned tonight, would the crew heed it and stay in?</b> Read the belief you have built.</div></div>';
+          : '<div style="text-align:center">'+face+'<div>'+(G.isDecoy?'The harbormaster wants two reads before the night turns. First, the tower lamp: ':'The harbormaster wants your read before the night turns. ')+'<b>If the lamp burned tonight, would the crew heed it and stay in?</b> Read the belief you have built.'+mstake+'</div></div>';
       announce(G.finale?'The night of the Deep. Ring the bell, or wave the fleet out?': askDecoy?'And Sefu’s lantern. Would the crew turn for that too?':'A muster. Would the crew heed a lit lamp tonight?');
     } else {
       musterRow.hidden=true; choiceRow.hidden=false; $('btnLight').disabled=false; $('btnDark').disabled=false;
