@@ -259,7 +259,7 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   <div id="hud">
     <div class="stat" id="tNight"><div class="lab">Night</div><div class="val" id="sNight">1 / 14</div></div>
     <div class="stat" id="tBoats"><div class="lab">Boats</div><div class="val boats" id="sBoats">⛵⛵⛵⛵⛵⛵⛵</div></div>
-    <div class="stat" id="tCatch"><div class="lab">Catch</div><div class="cbar" id="cBar"><div class="cfill" id="cFill"></div><div class="notch" id="cNotch"></div></div><div class="lab" id="cLab" style="margin-top:4px;text-transform:none"></div></div>
+    <div class="stat" id="tCatch"><div class="lab" id="cHead">Catch</div><div class="cbar" id="cBar"><div class="cfill" id="cFill"></div><div class="notch" id="cNotch"></div></div><div class="lab" id="cLab" style="margin-top:4px;text-transform:none"></div></div>
     <div class="stat" id="tSquall"><div class="lab">Squalls</div><div class="val" id="sSquall">0 / 5</div></div>
   </div>
   <div id="deepchip" hidden></div>
@@ -779,7 +779,8 @@ function rollNight(){
         : 'Read the dial and the line just below to judge the storm. ')
         + 'And that bar is the crew’s trust in your lamp, the poll you paid the newspaper for. It sits low, because the last keeper burned through it. Light the lamp only when a storm is really coming, and over the nights it will climb.'; }
     else if(G.night===2 && !r.boats){ r.boats=true; r.squalls=true; G.coach='New up top: your boats, and the big storms the almanac expects this season. The boats are the whole town’s living, so if you lose every one, the season is over. Warn the crew at the right times and you keep them and their boats safe.'; }
-    else if(G.night===4 && !r.musterTaught){ r.musterTaught=true; G.coach='Tonight the harbormaster calls a muster. This is how you earn their trust: she wants your read before the crew turns out. If you lit the lamp right now, would they heed it and stay in? Look at the trust bar. Above the line they come in, below it they sail past. Read them right on most of the season’s musters and you will have proven the trust is real.'; }
+    else if(G.night===3 && !r.catch){ r.catch=true; G.coach='New up top: your fish. On a calm night the crew sail out and land fish, and every fish sells for a little money, shown right there beside the count. It is not much at first, and your ice cellar only holds so many before the rest spoil. That money is your reward for keeping the lamp honest, and you carry it to the chandlery between seasons to catch more and earn more. So do not warn them for no reason, or you lose both their trust and the fish.'; }
+    else if(G.night===4 && !r.musterTaught){ r.musterTaught=true; if(!TESTMODE){ save.uiTaught=true; saveProgress(); } G.coach='Tonight the harbormaster calls a muster. This is how you earn their trust: she wants your read before the crew turns out. If you lit the lamp right now, would they heed it and stay in? Look at the trust bar. Above the line they come in, below it they sail past. Read them right on most of the season’s musters and you will have proven the trust is real.'; }
   }
   const L=G.lev, last = G.night===L.nights;
   G.finale = last;
@@ -923,8 +924,9 @@ function decide(arg){
         body='Your lamp was up and the storm came just as it promised, but only '+moored+' of seven moored. A boat that sailed past your warning is gone. They will remember the light was right.'; }
     } else if(lit && !storm){
       dTrust = -(L.aWolf!=null?L.aWolf:CONFIG.aWolf)*G.trust; kind='fa'; head='A false alarm.';
+      if(!heedNow){ earned=Math.round(CONFIG.catchPerNight*(CONFIG.crewN-moored)/CONFIG.crewN); G.catch+=earned; }   // the crew who ignored the warning still fished the calm night, and that catch still sells
       body = heedNow ? (moored+' of seven held in port on your word, and nothing came. Cry wolf too often and the belief you are building drains away.')
-                     : ('You lit the lamp on a calm night. Only '+moored+' of seven paid it mind, and what little belief you had thins again.');
+                     : ('You lit the lamp on a calm night, but only '+moored+' of seven paid it mind. The rest fished and came home full, while the belief you had thins again.');
     } else if(!lit && storm){
       dTrust = -CONFIG.aMiss*G.trust; kind='miss'; lostBoat=true; G.boats=Math.max(0,G.boats-1);
       head='A storm, and no warning.'; body='You left the lamp dark and a storm caught the fleet at sea. A boat is lost, and the crew marks that the light said nothing.';
@@ -1241,14 +1243,23 @@ function renderDecision(){
   $('sSquall').textContent = op? (G.rations+' of '+L.rations) : (G.stormsSpent+' / '+L.deckStorms);
   // Season 1 onboarding: HUD tiles appear one at a time (see rollNight); everything shows normally otherwise
   $('tBoats').hidden = G.onboard && !G.reveal.boats;
-  $('tCatch').hidden = (L.catchGoal===false) || (G.onboard && !G.reveal.catch);   // no catch goal in Season 1
+  $('tCatch').hidden = G.onboard && !G.reveal.catch;   // shown once revealed; in Season 1 it reads as fish -> money, not a goal
   $('tSquall').hidden = G.onboard && !G.reveal.squalls;
-  // catch bar
-  const frac=Math.min(1,G.catch/L.catchTarget);
-  $('cFill').style.width=(frac*100)+'%';
+  // the catch tile: a fish -> money readout in Season 1 (no goal), a feed-the-town goal bar from Season 2 on
   $('cNotch').style.left='100%';
-  $('cBar').classList.toggle('done', G.catch>=L.catchTarget);
-  $('cLab').textContent = G.catch>=L.catchTarget? 'the town will eat' : (G.catch+' of '+L.catchTarget);
+  if(L.catchGoal===false){
+    const cap=storageCap(), sold=Math.min(G.catch,cap), money=Math.round(sold*ECON.FISH_COIN*adMult());
+    $('cHead').textContent='Fish → money';
+    $('cFill').style.width=Math.min(100, cap? sold/cap*100 : 0)+'%';
+    $('cBar').classList.toggle('done', G.catch>=cap);
+    $('cLab').innerHTML='🐟 '+G.catch+' landed · <b>$'+money+'</b>'+(G.catch>cap?' <span style="color:var(--warn)">cellar full</span>':'');
+  } else {
+    $('cHead').textContent='Catch';
+    const frac=Math.min(1,G.catch/L.catchTarget);
+    $('cFill').style.width=(frac*100)+'%';
+    $('cBar').classList.toggle('done', G.catch>=L.catchTarget);
+    $('cLab').textContent = G.catch>=L.catchTarget? 'the town will eat' : (G.catch+' of '+L.catchTarget);
+  }
   // the Deep's shadow
   const dc=$('deepchip');
   if(G.night>=9 && !G.finale){ dc.hidden=false; dc.innerHTML='The water has been wrong at low tide. <b>The Deep comes in '+(L.nights-G.night)+' night'+((L.nights-G.night)===1?'':'s')+'.</b>'; }
