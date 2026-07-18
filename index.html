@@ -1782,17 +1782,8 @@ function drawScene(){
       }
     }
   } else {
-  // the dock: crews that moored stand by the lamp side; the rest walk to the boats
-  if(G && G.decided && G.moored!=null){
-    const k=G.moored, n=CONFIG.crewN;   // the seven crew (people), decoupled from the hull count
-    for(let i=0;i<n;i++){
-      const moor=i<k;
-      const t=motionOK? Math.min(1,(animTime%1000)):1;
-      const x= moor? W*0.30+i*20 : W*0.10+i*22;
-      const y= H*0.815;
-      drawCrewFigure(i, x, y, 34);
-    }
-  }
+  // the crew's response is read from the boats (out fishing vs moored at the dock), the trust meter, and the
+  // "X/7 moored" note, so we no longer scatter crew figures across the open water.
   // boats: out on the water if the crew sailed, else moored at the dock
   const out = G && G.decided && G.crewOut;
   const n = G? G.boats : 0;
