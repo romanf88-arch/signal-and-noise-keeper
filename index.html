@@ -478,21 +478,29 @@ const LEVELS = [
     debrief:{ body:'The lamp comes to mean danger to the crew only when you light it before real storms, night after night. Every time you light it and no storm comes, it means a little less to them. A signal that starts to stand for what comes after it, the way the lamp starts to stand for the storm, is what psychologists call <b>a conditioned signal</b>. Building that response up, night by night, is called <b>acquisition</b>.',
       transfer:'A fire alarm that goes off for burnt toast twice a week. What happens to how people act on it, and why?',
       url:'https://nobaproject.com/modules/conditioning-and-learning' } },
-  { id:2, name:'The Quiet Stretch', term:'extinction',
-    objective:'Keep the crew’s belief alive through a long calm, when almost no storm comes to confirm the lamp.',
-    back:'Last season you built the crew’s belief in the lamp. This season you watch what a long quiet does to it.',
-    nights:16, deckStorms:4, strata:[[1,9,0],[10,15,4]],
-    startTrust:56, heedThreshold:50, catchTarget:30, startBoats:7, decay:1.3, quiet:[1,9],
-    musterNights:[2,6,9,12,15], musterNeed:4,
-    almanac:'Marisol: “A thin almanac this year. Four squalls, they say, all riding the year’s end, and a long quiet before them.”',
+  { id:2, name:'The Frightened Fleet', term:'counterconditioning', fear:true,
+    objective:'The new crew are too afraid to sail far, so they catch too little to feed the town. On a calm night, push them a little further out than they are used to. A safe night with a full catch teaches them the water is not their enemy, and their courage grows. Do that again and again until they will fish the deep grounds. Never push them into a storm, or the fear comes roaring back.',
+    back:'The Deep is beaten, but it left the town shaken, and the storms took their share of boats and crew.',
+    nights:14, deckStorms:6, strata:[[1,5,2],[6,14,4]], startBoats:7, catchTarget:46, finaleHaul:30,   // the town cannot be fed from the near grounds alone; the deep-grounds haul (brave crew only) is what carries the winter
+    courageStart:16, heedThreshold:40,   // start timid; ~40 courage means they will fish the deep grounds at the finale
+    couGain:13,        // courage a safe, well-paced push builds on a calm night (counterconditioning)
+    couNearGain:4,     // courage a safe near-shore night builds while it settles them
+    couStorm:32,       // courage a storm strips when it catches a pushed crew (the fear, proven right)
+    // FLOODING: pushing agitates the crew. push again before a near-shore night settles them, and the push floods:
+    // the fear rebounds even on a calm night. this forces graded, paced exposure (systematic desensitization).
+    pushAgit:45, settleBy:40, floodAt:44, floodPenalty:16,
+    fishFar:6, fishNear:2,         // catch by how far out they fished; modest, so the season alone will not feed the town
+    rumorNight:8, rumorDrain:2, rumorFear:12,   // from night 8 a rumor of a monster spreads: a light nightly drain, and it lifts the courage they need at the finale
+    musterNights:[], musterNeed:0,
+    almanac:'Marisol, at the first tide: “A kinder almanac this year, only four squalls in it, and the deep grounds thick with fish. If only the young ones would sail out to them.”',
     story:{ era:'New York, 1924',
-      body:'Mary Cover Jones worked with a boy named Peter who was terrified of a white rabbit, and of most furry things too. Each day she placed the rabbit a little closer while Peter ate a snack he liked, and she let him watch other children hold the rabbit calmly. Little by little, his fear faded. Jones was one of the first to show that a learned fear can be undone, and she is often called the mother of behavior therapy.',
-      tie:'Jones removed a fear by teaching something new in its place. This season shows a simpler version of the same idea, called extinction: a learned response fades on its own once whatever taught it stops happening. Your lamp keeps burning, but no storm comes to prove it right, and the crew’s trust slowly drains away.',
+      body:'Mary Cover Jones worked with a boy named Peter who was terrified of a white rabbit. Each day she set the rabbit a little closer while Peter ate a snack he liked, and she let him watch other children hold the rabbit calmly. Step by step, the fear faded, until Peter could hold the rabbit himself. Jones was one of the first to show that a learned fear can be taught back out, and she is often called the mother of behavior therapy.',
+      tie:'Jones did not wait for the fear to fade on its own. She replaced it, by giving Peter something good at the very moment the rabbit came near, until the rabbit stopped meaning fear. Pairing a feared thing with a good feeling, a step at a time, is counterconditioning. Your crew fear the water the way Peter feared the rabbit, and a safe night with a full catch is the snack that teaches the fear back out of them.',
       url:'https://en.wikipedia.org/wiki/Mary_Cover_Jones' },
-    intro:'This is a quiet season. The storms have moved out to sea, and on every calm night the crew wonders why your lamp is still lit. The trust you built last season carried over with them, but trust that never gets tested does not simply stay put.',
-    debrief:{ body:'You watched the trust you had earned fade away just from going unused. To keep it alive, you had to spend the few storms that came instead of taking an easy night of fishing. When a learned response stops being confirmed, it weakens and can disappear, which psychologists call <b>extinction</b>. The lamp still works. Its meaning just wears thin on every night that no storm proves it right.',
-      transfer:'You learned to fear a dog that once bit you, then spent years around calm, friendly dogs. What happens to the fear over those years, and why?',
-      url:'https://en.wikipedia.org/wiki/Extinction_(psychology)' } },
+    intro:'The new hands who come to you now are young, and afraid. They lost fathers and brothers to the water, and they will not sail far from shore. But the fish that feed the town are out in the deep grounds, past where the frightened crew will go. You cannot order the fear out of them. You have to teach it out, a little further each calm night, until a safe catch far from shore is no longer something they dread.',
+    debrief:{ body:'The crew came to you afraid of the water, and you did not argue them out of it. You taught it out. Each calm night you sent them a little further than they dared, and each time they came home safe with a full catch, the water meant a little less fear and a little more food. Pairing a feared thing with a good outcome, one small step at a time, is called <b>counterconditioning</b>, and taking it in slow graded steps is <b>systematic desensitization</b>. Shove a frightened crew straight into the deep, or into a storm, and the fear only grows, which is why <b>flooding</b> a fear the sudden way tends to backfire.',
+      transfer:'Someone terrified of dogs is not helped by being shut in a room full of them. They are helped by a calm puppy across the room, then a step closer, then closer still, each step paired with feeling safe. Why does the slow way work when the sudden way backfires?',
+      url:'https://en.wikipedia.org/wiki/Systematic_desensitization' } },
   { id:3, name:'The Two Lights', term:'discrimination',
     objective:'Two lights burn on the water now. Teach the crew to heed your lamp and ignore Sefu’s look-alike lantern.',
     back:'Your lamp is believed. But a second light has appeared on the dock, and at first the crew cannot tell it from yours.',
@@ -528,11 +536,12 @@ const LEVELS = [
       url:'https://en.wikipedia.org/wiki/Operant_conditioning' } },
 ];
 function isOperant(L){ return L && L.startReadiness!=null; }
+function isFear(L){ return L && L.fear===true; }   // Season 2: counterconditioning. The meter is courage; the choice is how far to send them.
 function drillEmit(R,S,L){ const g=L.emitGamma, k=L.emitK; const rp=Math.pow(Math.max(0,R),g), sp=Math.pow(Math.max(0,S),g), kp=Math.pow(k,g); return rp/(rp+sp+kp); }
 let levelIdx=0, maxUnlocked=0;
 // persistent save: the harbor economy + progress, as one versioned JSON blob. Migrates the old bare keeperMax once.
 const SAVE_V = 2;   // bump this when the save shape changes; older saves are wiped so the new intro runs fresh
-function defaultSave(){ return { v:SAVE_V, money:0, hulls:1, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, maxUnlocked:0, tutDone:false, uiTaught:false, coachedLoss:false }; }
+function defaultSave(){ return { v:SAVE_V, money:0, hulls:1, storageTier:0, adTier:0, instrTier:0, pollTier:0, wharfTier:0, oldHand:0, maxUnlocked:0, tutDone:false, uiTaught:false, coachedLoss:false }; }
 let save = defaultSave();
 try{
   const raw = localStorage.getItem('keeperSave');
@@ -583,6 +592,10 @@ function shopItems(){ const all = [
     cost:[30,55,90][save.adTier]!=null?[30,55,90][save.adTier]:null, gated:false,
     effect:[30,55,90][save.adTier]!=null?('Raises what each fish fetches from '+(1+0.3*save.adTier).toFixed(1)+'x to '+(1+0.3*(save.adTier+1)).toFixed(1)+'x.'):'Fish already sell for all the market will give.',
     teach:'Criers call your catch through the market so each fish sells for more. Money is your own reward for keeping the lamp honest, and this raises how much that reward is worth.' },
+  { key:'oldHand', name: save.oldHand? 'The Old Hand' : 'Hire the Old Hand', sub: save.oldHand? 'sailing with the crew' : 'not hired',
+    cost: save.oldHand<1? 55 : null, gated: maxUnlocked<1,
+    effect: save.oldHand? 'A veteran rides along, so the young crew steady faster and you can push them out on back-to-back nights without overwhelming them.' : 'A veteran fisher to ride along with the frightened crew. They take heart from someone unafraid beside them, and settle faster after a hard night out.',
+    teach:'A fear shrinks faster when you watch someone unafraid face the same thing. Jones cut Peter’s fear not only with snacks, but by letting him watch other children hold the rabbit calmly. Psychologists call learning by watching others modeling.' },
 ];
   // during the tutorial rebuild, the chandlery shows only what you need to get started: boats to rebuild the fleet, and the newspaper.
   return (_shopReturn==='tutorial') ? all.filter(it=>it.key==='hulls'||it.key==='pollTier') : all;
@@ -625,6 +638,10 @@ const BUY_DLG = {
     { who:'marisol', line:"The criers will call your catch through the whole market now, so each fish fetches a little more. Same nets, more coin." },
     { who:'marisol', line:"And here is the strange thing about that coin. It is not what you actually want, is it. You want food, a warm house, a future for the children. Money only became a reward because it has been paired with all of that your whole life. Scientists call that a secondary reinforcer, a reward learned by association, the same way the crew learned the lamp." },
   ],
+  oldHand: [
+    { who:'marisol', line:"Good. The old hand has fished the deep grounds his whole life and never lost his nerve. Sat beside him in the boat, the young ones see there is nothing to shake at, and they steady quicker after a hard night out." },
+    { who:'marisol', line:"That is a real way to shrink a fear, watching someone unafraid face the very thing that scares you. Jones used it on Peter too, letting him watch other children hold the rabbit calmly. Psychologists call learning by watching others modeling." },
+  ],
 };
 let _buyDlg=null, _buyIx=0;
 function showBuyDialogue(key){ let e=BUY_DLG[key]; if(typeof e==='function') e=e(save[key]!=null?save[key]:0); _buyDlg=e; _buyIx=0; if(!_buyDlg||!_buyDlg.length){ renderShop(); return; } renderBuyDlg(); }
@@ -660,7 +677,25 @@ const DEEP_INTRO=[
   { who:'marisol', line:"And here is the cruel part. A storm you can at least see coming in the sky. The Deep gives no sign at all, no cloud, no wind, nothing in the glass. So tomorrow night there is no weather to judge. The only thing that keeps the crew off the water is whether they trust your lamp enough to stay in port on a clear, calm night, on your word alone." },
   { who:'marisol', link:'https://en.wikipedia.org/wiki/Classical_conditioning', linkText:'Read about the conditioned response ↗', line:"That is the real test of everything you built this season. If the crew come into port at the lamp alone, on a clear night with no danger they can see, that is the conditioned response, the whole point of what you taught them. So watch the trust bar before you ring the bell. Above the line, they heed you and live. Below it, they sail out, and the Deep takes them." },
 ];
-const FINALE_INTROS={ 1:DEEP_INTRO };   // per-season pre-finale exchange, keyed by level id
+const FINALE_INTROS={ 1:DEEP_INTRO, 2:null };   // per-season pre-finale exchange, keyed by level id (S2 set below)
+// Season 2 opening: Marisol introduces the frightened new crew and the counterconditioning mechanic.
+const SEASON2_INTRO=[
+  { who:'marisol', line:"The Deep is beaten, but it cost us. The storms and the beast took boats and crew both, and some of them were the fathers and brothers of these young ones stepping up to fish now." },
+  { who:'marisol', line:"That is the trouble. They are terrified of the water that took their families, and they will not sail far from shore. But the fish that feed the town are out in the deep grounds, past where a frightened crew will go. Land too little out there, and the town starves this winter." },
+  { who:'marisol', line:"You cannot order the fear out of them. You have to teach it out, the way it went in. On a calm night, push them a little further than they dared. If they come home safe with a full catch, the water means a little less fear, and their courage grows. Do that again and again." },
+  { who:'marisol', link:'https://en.wikipedia.org/wiki/Systematic_desensitization', linkText:'Read about how a fear is un-taught ↗', line:"But go gently. Push them out two nights running, with no easy night near shore in between to steady them, and it overwhelms them, and the fear comes back worse. And never push them into a storm, or the sea proves every fear right at once. Small steps, well paced, is the whole art of it." },
+  { who:'marisol', line:"Watch their courage on the bar below, the way you watched their trust last season. Get it above the line by the end, and they will sail the deep grounds on the night the town needs it most. Now go, and be patient with them." },
+];
+const SEASON_INTROS={ 2:SEASON2_INTRO };   // per-season opening exchange
+let _shownSeasonIntro={};
+// Season 2 pre-finale: the monster rumor, a fear spread on words alone.
+const S2_FINALE_INTRO=[
+  { who:'marisol', line:"It is the last night, and the town is nearly out of food. The only fish left are in the deep grounds, far out where you have been coaxing the crew all season." },
+  { who:'marisol', line:"But a story is going round the docks. Someone swears they saw a monster out in the deep, huge, waiting. No one has truly seen it, mind. The tale grew in the telling, passed mouth to mouth, until half the town believes it." },
+  { who:'marisol', link:'https://en.wikipedia.org/wiki/Fear_conditioning', linkText:'Read about fear learned from others ↗', line:"That is the thing about a fear. It can spread from person to person on words alone, with nothing real behind it. The crew are frightened of a monster not one of them has laid eyes on." },
+  { who:'marisol', line:"So it comes to this. If you built their courage high enough, past the rumor, they will sail the deep grounds anyway and find nothing out there but fish. If you did not, the story wins and the town goes hungry. Read the courage bar, then send them, or keep them home." },
+];
+FINALE_INTROS[2]=S2_FINALE_INTRO;
 function renderShop(){
   overlayWrap.hidden=false; overlayWrap.classList.remove('titlescreen'); overlay.style.cssText='';
   showBgVideo(false); theme(true);
@@ -766,11 +801,11 @@ function newGame(idx){
   const L=LEVELS[levelIdx];
   rng = mulberry32(((Math.random()*1e9)|0)||7);
   auxRng = mulberry32(((Math.random()*1e9)|0)||101);   // isolated probe/mini-game stream (never touches the deck/gauge/dock sequence)
-  G = { lev:L, night:1, boats:(isOperant(L)? L.startBoats : Math.max(save.hulls||L.startBoats, L.minFleet||0)), trust:(L.startTrust!=null?L.startTrust:(L.startReadiness||0)), catch:0,
+  G = { lev:L, night:1, boats:(isOperant(L)? L.startBoats : Math.max(save.hulls||L.startBoats, L.minFleet||0)), trust:(isFear(L)? (L.courageStart||0) : (L.startTrust!=null?L.startTrust:(L.startReadiness||0))), catch:0,
         decided:false, lit:false, outcome:null, log:[], stats:{hit:0,fa:0,miss:0,cr:0},
         weatherStorm:false, crewOut:false, sky:0, finale:false, inQuiet:false,
         isMuster:false, musterAnswered:false, musterCall:null, musterRight:0, musterCount:0, lastMuster:null,
-        moored:null, mooredHistory:[], insights:{}, seen:{}, trustHistory:[(L.startTrust!=null?L.startTrust:(L.startReadiness||0))],
+        moored:null, mooredHistory:[], insights:{}, seen:{}, trustHistory:[(isFear(L)? (L.courageStart||0) : (L.startTrust!=null?L.startTrust:(L.startReadiness||0)))],
         stormsSpent:0, nightLog:[],
         deck:buildDeck(L),
         // SEASON 3: the decoy (Sefu's lantern) = CS-. A second dealt deck, collision-forbidden with storms.
@@ -816,7 +851,7 @@ function rollNight(){
   const L=G.lev, last = G.night===L.nights;
   G.finale = last;
   G.inQuiet = !!(L.quiet && G.night>=L.quiet[0] && G.night<=L.quiet[1]);
-  G.isMuster = (L.musterNights && L.musterNights.indexOf(G.night)>=0) || last;
+  G.isMuster = !isFear(L) && ((L.musterNights && L.musterNights.indexOf(G.night)>=0) || last);   // Season 2 has no musters; its finale is a push/close choice, not a prediction
   if(isOperant(L)){
     // SEASON 4: the crew EMITS a behavior first (the inverted loop). Reward it or bank the ration.
     G.drillP = drillEmit(G.readiness, G.ritual, L);
@@ -839,7 +874,7 @@ function rollNight(){
   G.heedP = heedProb(G.trust, L.heedThreshold);
   G.heedTendency = G.trust >= L.heedThreshold;
   G.decoyTendency = G.vMinus >= L.heedThreshold;
-  G.isMuster = (L.musterNights && L.musterNights.indexOf(G.night)>=0) || last;
+  G.isMuster = !isFear(L) && ((L.musterNights && L.musterNights.indexOf(G.night)>=0) || last);   // Season 2 has no musters; its finale is a push/close choice, not a prediction
   // pick tonight's sky line from the band pool (no repeats within a season)
   if(!last){ const band=skyBand(G.sky); const pool=G.pools[band];
     G.skyLine = pool.length? pickPool(pool) : (SKYPOOL[band][0]); }
@@ -915,6 +950,7 @@ function decide(arg){
   if(G.isMuster && !G.musterAnswered) return;   // the harbormaster gets her answer first
   const L=G.lev, thresh=L.heedThreshold;
   if(isOperant(L)){ return decideOperant(arg); }   // SEASON 4: reward the behavior
+  if(isFear(L)){ return decideFear(arg); }          // SEASON 2: push the crew further out, or keep them close
   const lit=arg;
   audioOn(); G.decided=true; G.lit=lit; lit?snd.light():snd.dark();
   const storm=G.weatherStorm;
@@ -990,6 +1026,82 @@ function decide(arg){
   G.log.push(kind);
   onboardReveal(lit, storm, moored);   // Season 1: reveal CS/US/CR as each first appears
   if(insight) playSnd('page_turn',0.4);
+  state='resolved'; presentOutcome();
+}
+// SEASON 2 (counterconditioning): the meter is COURAGE (stored in G.trust). Push them past their comfort on a
+// calm night to build it; a storm that catches a pushed crew tears it back down. From rumorNight a monster rumor
+// drains courage on its own. push=true => send them out to the deep grounds; push=false => keep them close.
+function decideFear(push){
+  const L=G.lev, storm=G.weatherStorm;
+  audioOn(); G.decided=true; G.lit=push; push?snd.light():snd.dark();
+  if(G.finale){ return resolveFinaleFear(push); }
+  let dCour=0, kind, head, body, lostBoat=false, earned=0, concept=null;
+  const agit=G.agitation||0;
+  if(push){
+    G.crewOut=true;
+    if(storm){
+      lostBoat=true; G.boats=Math.max(0,G.boats-1); dCour=-L.couStorm; G.agitation=agit+30; kind='miss';
+      head='Pushed into a storm.';
+      body='You sent the crew out past their nerve, and a storm caught them there. A boat is gone, and every fear they had of the deep water just came true. They will be far harder to coax out now.';
+      concept={ term:'a fear, re-learned', txt:'One bad scare in the feared place can undo weeks of coaxing at a stroke. This is why you never push a frightened crew into real danger. A single storm out deep teaches more fear than many calm nights taught courage.' };
+    } else if(agit >= L.floodAt){
+      // FLOODING: pushed out again before a calm near-shore night settled them
+      earned=L.fishNear; G.catch+=earned; dCour=-L.floodPenalty; G.agitation=agit+16; kind='miss';
+      head='Too far, too fast.';
+      body='You drove them out past their nerve a second night running, with no easy night near shore to steady them between. It was too much at once. They came home rattled, and the fear crept back stronger than before.';
+      concept={ term:'flooding', txt:'Forcing a frightened crew to face the deep faster than they can settle is flooding, and it tends to make a fear worse, not better. A fear fades only when the steps are small and paced, with calm ground in between. That patience is what Jones called systematic desensitization.' };
+    } else {
+      earned=L.fishFar; G.catch+=earned; dCour=L.couGain; G.agitation=agit+(L.pushAgit-(save.oldHand?20:0)); kind='hit';   // the Old Hand steadies them, so they agitate less
+      head='Further out, and safe.';
+      body='You pushed them a little past where they liked to go, and nothing took them. They came home full, and the deep water lost some of its teeth. Their courage grows.';
+      concept={ term:'counterconditioning', txt:'You paired the feared water with a calm night and a full catch, so the fear is slowly replaced by something good. Taken one small step at a time, that is counterconditioning, the way Jones taught Peter to hold the rabbit.' };
+    }
+  } else {
+    G.crewOut = !storm;
+    G.agitation = Math.max(0, agit - L.settleBy);   // a night near shore settles their nerves
+    if(storm){
+      kind='cr'; head='Held close, and a storm passed.';
+      body='You kept the crew near shore, and when the storm blew up they were already safe in. No boats lost, but no fish either. Their nerves settled a little.';
+    } else {
+      earned=L.fishNear; G.catch+=earned; dCour=L.couNearGain; kind='cr';
+      head='A quiet night near shore.';
+      body='The crew fished close to home where they feel safe. A modest catch, and an easy night that settles them, which is exactly what lets you push them out again tomorrow.';
+    }
+  }
+  if(L.rumorNight && G.night>=L.rumorNight && !storm) dCour -= L.rumorDrain;   // the rumor gnaws at their nerve
+  G.trust = Math.max(0, Math.min(100, G.trust + dCour));
+  const statKey = kind==='hit'?'hit':(kind==='miss'?'miss':'cr');
+  if(G.stats[statKey]!=null) G.stats[statKey]++;
+  if(storm) G.stormsSpent++;
+  G.trustHistory.push(+G.trust.toFixed(1));
+  G.nightLog.push({ n:G.night, sky:+G.sky.toFixed(2), storm, lit:push, moored:null, kind, trust:+G.trust.toFixed(1) });
+  G.outcome = { kind, head, body, dTrust:dCour, lostBoat, earned, storm, heedNow:false, insight:null, bark:null, firstOfKind:true, concept, moored:null, decoyMoored:null };
+  G.log.push(kind);
+  state='resolved'; presentOutcome();
+}
+// SEASON 2 finale: the town needs a haul from the deep grounds, where a monster is rumored. The monster is not
+// real, so no one drowns. Whether the crew go depends only on the courage you built against the fear.
+function resolveFinaleFear(push){
+  const L=G.lev, thresh=L.heedThreshold, brave = G.trust>=thresh;
+  G.crewOut=false;   // there is no monster: no boat is lost. the danger is a rumor.
+  let head, body, kind, earned=0, concept=null;
+  if(push && brave){
+    earned=L.finaleHaul||30; G.catch+=earned; kind='hit'; head='They sailed for the deep.';
+    body='The rumor said a monster waited in the deep grounds. You had built their courage past the fear, so they went anyway, and there was no monster, only the richest catch of the year. The town will eat through the winter.';
+    concept={ term:'a fear overcome', txt:'The monster was never real. It was a fear the frightened town talked itself into. The courage you built, one calm night at a time, was enough for the crew to face the rumor and find nothing behind it.' };
+  } else if(push){
+    earned=L.fishNear; G.catch+=earned; kind='miss'; head='They turned back at the deep.';
+    body='You sent them for the deep grounds, but the rumor of the monster had a firmer hold on them than your coaxing did. They lost their nerve and rowed home with almost nothing. There was no monster out there, only fish they were too frightened to take.';
+    concept={ term:'a fear left in place', txt:'The monster was only a story, but the crew were never made brave enough to test it, so for them it may as well have been real. A fear you do not teach back out will run a life even with nothing behind it.' };
+  } else {
+    earned=L.fishNear; G.catch+=earned; kind='miss'; head='They stayed near shore.';
+    body='You kept the crew close on the very night the town needed the deep grounds. They were safe, and they went hungry, because the fish that would carry the winter were out where the fear still kept them.';
+    concept={ term:'safe is not the same as right', txt:'Keeping a frightened crew close felt like kindness, but it left the fear in place and the town unfed. The only way past a fear is usually through it, in careful steps.' };
+  }
+  G.trustHistory.push(+G.trust.toFixed(1)); G.stats[kind]++;
+  G.nightLog.push({ n:G.night, sky:null, storm:false, lit:push, moored:null, kind, trust:+G.trust.toFixed(1) });
+  G.outcome={ kind, head, body, dTrust:0, lostBoat:false, earned, storm:false, heedNow:brave, insight:null, bark:null, firstOfKind:false, concept };
+  G.log.push(kind);
   state='resolved'; presentOutcome();
 }
 // SEASON 4 (operant): reward or bank the ration for the behavior the crew just emitted.
@@ -1175,15 +1287,20 @@ function proceed(){ if(state!=='resolved') return;
     const readEnough = G.musterRight >= (G.lev.musterNeed||0) && G.dRight >= (G.lev.decoyNeed||0);
     let reason='win';
     if(!survived) reason = isOperant(G.lev)? (G.finaleRitualLoss?'superstition':'weak') : (G.finaleDecoyLoss? 'decoy':'deep');
-    else if(!fed) reason='hungry'; else if(!readEnough) reason='misread';
+    else if(!fed) reason = isFear(G.lev)?'afraid':'hungry'; else if(!readEnough) reason='misread';
     endGame(survived && fed && readEnough, reason);
     return;
   }
-  // MERCY RULE (classical seasons only): end a mathematically-lost season early rather than grind it out.
-  if(!isOperant(G.lev) && G.night>=5){
+  // MERCY RULE (classical trust seasons only): end a mathematically-lost season early rather than grind it out.
+  if(!isOperant(G.lev) && !isFear(G.lev) && G.night>=5){
     let t=G.trust; const left=G.lev.deckStorms - G.stormsSpent;
     for(let i=0;i<left;i++) t += CONFIG.aRight*(100-t);
     if(t < 45){ endGame(false,'mercy'); return; }
+  }
+  // Season 2 mercy: if the boats are gone, or there is no way left to feed the town, end it.
+  if(isFear(G.lev) && G.night>=6){
+    const nightsLeft=G.lev.nights-G.night, maxMore=nightsLeft*G.lev.fishFar + G.lev.fishFar*3;   // best case: push every night + the finale haul
+    if(G.catch + maxMore < G.lev.catchTarget){ endGame(false,'afraid'); return; }
   }
   G.night++; rollNight();
   if(G.finale && FINALE_INTROS[G.lev.id] && !G.finaleIntroShown && !TESTMODE){   // explain the Deep before the last night
@@ -1230,9 +1347,13 @@ function conceptMap(L){
     +'<div class="m"><div class="t">Generalization</div><b>Mooring for both lights.</b> The response to your lamp spread to anything that looked like it.</div>'
     +'<div class="m"><div class="t">Discrimination</div><b>Heeding one, ignoring the other.</b> The crew learned to answer only the light that pays off.</div>'
     +'</div>';
-  const fourth = L.id===2
-    ? { t:'Extinction', b:'The belief fading when the lamp went night after night unconfirmed.' }
-    : { t:'Acquisition', b:'The belief building, night by night, as the lamp kept proving right.' };
+  if(isFear(L)) return '<h3>The four parts, named</h3><div class="dmap">'
+    +'<div class="m"><div class="t">The feared thing</div><b>The deep water.</b> The crew learned to fear it after the sea took their families.</div>'
+    +'<div class="m"><div class="t">Counterconditioning</div><b>A safe night, a full catch.</b> Pairing the feared water with a good outcome slowly replaces the fear with calm.</div>'
+    +'<div class="m"><div class="t">Systematic desensitization</div><b>A little further each calm night.</b> Small, paced steps, with easy nights near shore in between, so the fear never overwhelms them.</div>'
+    +'<div class="m"><div class="t">Flooding</div><b>Pushed too far, too fast.</b> Force a frightened crew past their nerve all at once, and the fear grows instead of fading.</div>'
+    +'</div>';
+  const fourth = { t:'Acquisition', b:'The belief building, night by night, as the lamp kept proving right.' };
   return '<h3>The four parts, named</h3><div class="dmap">'
     +'<div class="m"><div class="t">Conditioned stimulus · CS</div><b>Your lamp.</b> A signal that meant nothing to the crew at first.</div>'
     +'<div class="m"><div class="t">Unconditioned stimulus · US</div><b>The storm.</b> The real danger the lamp came to stand for.</div>'
@@ -1268,6 +1389,8 @@ function renderDecision(){
     $('legend').hidden = false;
     $('legend').innerHTML = (op
       ? '💪 the drill = the crew’s own action <b>(operant behavior)</b> &nbsp;·&nbsp; 🥃 the ration = the reward that follows it <b>(reinforcer)</b>'
+      : isFear(L)
+      ? '🌊 the deep water = the feared thing &nbsp;·&nbsp; 🐟 a safe catch = the good pairing &nbsp;·&nbsp; ⚓ sailing out = the fear replaced with courage <b>(counterconditioning)</b>'
       : L.id===3
       ? '🔦 your lamp = the reliable signal <b>(CS+)</b> &nbsp;·&nbsp; 🏮 Sefu’s lantern = the look-alike <b>(CS-)</b> &nbsp;·&nbsp; ⚓ crew mooring = the response <b>(CR)</b>'
       : '🔦 the lamp = the signal <b>(CS)</b> &nbsp;·&nbsp; ⛈ the storm = the danger it warns of <b>(US)</b> &nbsp;·&nbsp; ⚓ the crew mooring = the learned response <b>(CR)</b>');
@@ -1295,13 +1418,18 @@ function renderDecision(){
     $('cBar').classList.toggle('done', G.catch>=L.catchTarget);
     $('cLab').textContent = G.catch>=L.catchTarget? 'the town will eat' : (G.catch+' of '+L.catchTarget);
   }
-  // the Deep's shadow
+  // the looming finale: the Deep for most seasons, the monster rumor and the town's hunger for Season 2
   const dc=$('deepchip');
-  if(G.night>=9 && !G.finale){ dc.hidden=false; dc.innerHTML='The water has been wrong at low tide. <b>The Deep comes in '+(L.nights-G.night)+' night'+((L.nights-G.night)===1?'':'s')+'.</b>'; }
+  if(isFear(L)){
+    if(G.finale){ dc.hidden=false; dc.innerHTML='<b>The town is hungry, and the deep grounds wait.</b>'; }
+    else if(L.rumorNight && G.night>=L.rumorNight){ dc.hidden=false; dc.innerHTML='The rumor of a monster is spreading. <b>The town needs the deep grounds in '+(L.nights-G.night)+' night'+((L.nights-G.night)===1?'':'s')+'.</b>'; }
+    else dc.hidden=true;
+  }
+  else if(G.night>=9 && !G.finale){ dc.hidden=false; dc.innerHTML='The water has been wrong at low tide. <b>The Deep comes in '+(L.nights-G.night)+' night'+((L.nights-G.night)===1?'':'s')+'.</b>'; }
   else if(G.finale){ dc.hidden=false; dc.innerHTML='<b>The night of the Deep.</b>'; }
   else dc.hidden=true;
   renderBelief();
-  $('belief').hidden = !(save.pollTier>=1) || (G.onboard && !G.reveal.meter);   // the meter needs the Gazette AND (in S1) its intro callout
+  $('belief').hidden = isFear(L) ? false : (!(save.pollTier>=1) || (G.onboard && !G.reveal.meter));   // Season 2: the courage meter is always shown; otherwise the meter needs the Gazette AND (in S1) its intro callout
   $('log').innerHTML = G.log.slice(-12).map(k=>{
     const t={hit:'right',fa:'cried wolf',miss:'missed',cr:'calm',coFa:'both lit',decoyClear:'stood clear',reinDrill:'rewarded',holdDrill:'held',reinRitual:'mis-rewarded',holdRitual:'saved'}[k]||'·';
     const cls={coFa:'fa',decoyClear:'cr',reinDrill:'hit',holdDrill:'miss',reinRitual:'fa',holdRitual:'cr'}[k]||k;
@@ -1310,6 +1438,25 @@ function renderDecision(){
   const choiceRow=$('choiceRow'), musterRow=$('musterRow'), nextRow=$('nextRow'), cl=$('cueline');
   if(state==='reading'){
     nextRow.hidden=true; $('insight').hidden=true; $('fieldnote').hidden=true; $('btnWave').hidden=false;
+    if(isFear(L)){
+      // SEASON 2: read the weather, then decide how far to send the crew. btnLight = push out, btnDark = keep close.
+      musterRow.hidden=true; choiceRow.hidden=false; $('btnLight').disabled=false; $('btnDark').disabled=false;
+      const hasGlass = save.instrTier>=1;
+      $('sky').hidden = !hasGlass; if(hasGlass) $('skyNeedle').style.left=Math.round(G.sky*100)+'%';
+      if(G.finale){
+        $('btnLight').innerHTML='Send them to the deep<span class="sub">the rich grounds, past the rumor</span>';
+        $('btnDark').innerHTML='Keep them near shore<span class="sub">safe, but the town stays hungry</span>';
+        cl.innerHTML='<b>The town needs one great haul, and the only fish left are in the deep grounds, where the crew swear a monster waits.</b><br>There is no storm tonight, only the rumor. Read their courage below: above the line, they are brave enough to face it and find nothing there. Send them to the deep, or keep them near shore.';
+        announce('The last night. Send them to the deep grounds, or keep them near shore?'); return;
+      }
+      $('btnLight').innerHTML='Push them further out<span class="sub">toward the deep grounds</span>';
+      $('btnDark').innerHTML='Keep them near shore<span class="sub">safe, a smaller catch</span>';
+      const rumor = (L.rumorNight && G.night>=L.rumorNight);
+      cl.innerHTML='Night '+G.night+'. '+G.skyLine+' <b>'+skyOdds(G.sky)+'</b>.'
+        + (hasGlass && G.night===1 ? ' <span style="color:#9fd8b0">The dial above is your barometer: the further toward STORM, the likelier a storm.</span>' : '')
+        + (rumor ? ' <span style="color:#e0b978">Talk on the dock of a monster in the deep grounds has the young crew spooked.</span>' : '');
+      announce('Night '+G.night+'. '+G.skyLine+' '+skyOdds(G.sky)+'. Push them further out, or keep them near shore?'); return;
+    }
     if(op){
       $('sky').hidden=true;
       if(G.finale){
@@ -1454,6 +1601,16 @@ function renderBelief(){
       : 'Not yet a habit. Reward the nights they actually drill to build it.';
     return;
   }
+  if(isFear(L)){   // SEASON 2: the meter is the crew's courage, stored in G.trust
+    $('bLab').textContent='The crew’s courage';
+    $('bFill').style.width=G.trust+'%'; $('bHeed').style.left=thr+'%';
+    $('bNote').textContent = G.trust>=thr ? 'brave enough to fish the deep grounds' : 'not yet brave enough for the deep grounds';
+    $('bRow2').hidden=true;
+    $('bHint').innerHTML = G.trust>=thr
+      ? 'They will sail the deep grounds now. Keep their nerve up on calm nights, and hold it past the monster rumor.'
+      : 'Below the line. Push them a little further out on a calm night, and a safe catch will teach the fear back out.';
+    return;
+  }
   $('bLab').textContent = L.id===3? 'Their belief in your lamp (CS+)' : 'The crew’s belief in your lamp';
   $('bFill').style.width=G.trust+'%';
   $('bHeed').style.left=thr+'%';
@@ -1473,7 +1630,13 @@ function renderBelief(){
       : (L.decay? 'Below the line and slipping. Spend the rare storms to build it back.' : 'Below the line. Warn them truly and reliably, and it will build.');
   }
 }
-function startLevel(){ audioOn(); theme(false); newGame(levelIdx); state='reading'; overlayWrap.hidden=true; showBgVideo(false); renderDecision(); canvas.focus({preventScroll:true}); }
+function startLevel(){ audioOn(); theme(false); newGame(levelIdx); showBgVideo(false);
+  const L=LEVELS[levelIdx];
+  if(!TESTMODE && SEASON_INTROS[L.id] && !_shownSeasonIntro[L.id]){   // a one-time opening exchange for the season
+    _shownSeasonIntro[L.id]=true;
+    showDialogue(SEASON_INTROS[L.id], ()=>{ state='reading'; overlayWrap.hidden=true; renderDecision(); canvas.focus({preventScroll:true}); }); return;
+  }
+  state='reading'; overlayWrap.hidden=true; renderDecision(); canvas.focus({preventScroll:true}); }
 /* ============================ SLIDESHOW ============================ */
 // Paged, one-idea-per-screen presentation of the psychology, with a visual on every slide, so the
 // teaching cannot be scrolled past. Each slide: {kicker,title,visual(html),body(html)}; the last slide
@@ -1602,12 +1765,15 @@ function renderOverlay(){
   }
   const s=G.stats, won=state==='won', why=G.endReason||'boats';
   const opv=isOperant(L);
-  const titles={ win:'The fleet came home', boats:'The harbor is empty', deep:'The Deep took them', hungry:'A hungry winter', misread:'You never knew the crew', mercy:'The season turns without you', decoy:'They followed the wrong light', weak:'They stood frozen at the rail', superstition:'A ritual that saved no one' };
+  const titles={ win:'The fleet came home', boats:'The harbor is empty', deep:'The Deep took them', hungry:'A hungry winter', misread:'You never knew the crew', mercy:'The season turns without you', decoy:'They followed the wrong light', weak:'They stood frozen at the rail', superstition:'A ritual that saved no one', afraid:'The fear won' };
   const missed=G.stats.miss;
   const leads={
-    win: opv
+    win: isFear(L)
+      ? 'You did not argue the crew out of their fear. You taught it out, a calm night at a time, until they would sail the deep grounds. And when the whole town swore a monster waited out there, the courage you had built was enough for them to go anyway. There was nothing in the deep but the richest catch of the year, and the town will eat through the winter.'
+      : opv
       ? 'You brought the crew through to the lowest tide, and when the Deep rose they ran the drill on their own, without a word from you, and they had fished the calm nights well enough to see the town through the winter.'
       : 'You brought the crew through to the lowest tide, and when the Deep rose they trusted the lamp enough to stay ashore, and they had fished the calm nights well enough to see the town through the winter.',
+    afraid:'The town needed a haul from the deep grounds, and the crew were still too afraid to go. The monster they feared was never real, only a story that spread through the docks, but you never built their courage enough for them to test it. So the fear won, and the town goes into winter hungry.',
     boats:'You ran out of boats before the season turned. Too many nights the crew was caught out on the water.',
     deep:'You reached the last night, but the crew never came to trust the lamp enough. When you lit it, they did not believe there was any danger on so clear a night, so they sailed out. The Deep rose under them and dragged the boats down. A warning only works if the crew believe it, and yours came too late.',
     hungry:'You kept the boats safe, but the crew spent too many good nights ashore, and the town went into winter without enough catch. Warning on a calm night costs you even when no one drowns.',
@@ -1895,6 +2061,7 @@ window.keeper={
   get save(){return save;},   // battery can equip shop tiers: keeper.save.instrTier=3
   resetSave(){ save=defaultSave(); },
   snapshot(){ return G?{ night:G.night, nights:G.lev.nights, boats:G.boats, trust:+(G.trust||0).toFixed(1), thresh:G.lev.heedThreshold,
+      agitation:(G.agitation||0), floodAt:(G.lev.floodAt||999), fear:isFear(G.lev),
       catch:G.catch, target:G.lev.catchTarget, sky:+(G.sky||0).toFixed(2), storm:G.weatherStorm, inQuiet:G.inQuiet,
       isMuster:G.isMuster, musterAnswered:G.musterAnswered, musterCall:G.musterCall, musterPhase:G.musterPhase, finale:G.finale,
       heedP:+(G.heedP||0).toFixed(3), heedTendency:G.heedTendency, moored:G.moored, mooredHistory:G.mooredHistory.slice(),
