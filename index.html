@@ -880,8 +880,9 @@ function rollNight(){
     G.skyLine = pool.length? pickPool(pool) : (SKYPOOL[band][0]); }
   // staging: the Deep's video rises on the finale; its horn sounds as the last nights open
   if(!TESTMODE){
-    if(last) showBgVideo(true,'deep_rising');
-    else if(G.night>=L.nights-2) playSnd('foghorn',0.25);
+    if(last && !isFear(G.lev)) showBgVideo(true,'deep_rising');   // Season 2's finale monster is a delusion; never show the real Deep there
+    else if(last) showBgVideo(false);
+    else if(G.night>=L.nights-2 && !isFear(G.lev)) playSnd('foghorn',0.25);
   }
 }
 /* ============================ THE PROBE (CS-alone test) ============================ */
