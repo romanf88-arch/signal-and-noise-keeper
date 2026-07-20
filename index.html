@@ -103,6 +103,7 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   .skytop .skytitle{ font-family:'Cinzel',serif; font-size:12px; letter-spacing:.5px; color:var(--lamp); text-transform:none; }
   .skybar{ position:relative; height:16px; margin-top:5px; border-radius:9px; overflow:hidden;
     background:linear-gradient(90deg,#4f8f9a 0%,#5fb585 22%,#e0a23a 60%,#d2694a 100%); box-shadow:inset 0 1px 3px rgba(0,0,0,.4); }
+  .skyband{ position:absolute; top:0; bottom:0; left:0; width:0; background:rgba(255,255,255,.22); border-left:1px solid rgba(255,255,255,.35); border-right:1px solid rgba(255,255,255,.35); transition:left .35s, width .35s; }
   .skyneedle{ position:absolute; top:-4px; bottom:-4px; width:4px; left:0; background:#fff; border-radius:2px; box-shadow:0 0 6px rgba(0,0,0,.6); transition:left .35s cubic-bezier(.2,.7,.2,1); }
   .skyneedle::after{ content:'▲'; position:absolute; top:-13px; left:50%; transform:translateX(-50%); color:#fff; font-size:10px; }
   #cueline{ font-family:'Spectral',serif; font-size:16px; color:#eef2fa; min-height:46px; line-height:1.45; }
@@ -278,7 +279,8 @@ SIGNAL & NOISE: THE KEEPER - spec (numbered, per building-games Phase 0)
   <div id="decide">
     <div id="sky" hidden>
       <div class="skytop"><span>CALM</span><span class="skytitle">tonight's sky</span><span>STORM</span></div>
-      <div class="skybar"><div class="skyneedle" id="skyNeedle"></div></div>
+      <div class="skybar"><div class="skyband" id="skyBand"></div><div class="skyneedle" id="skyNeedle"></div></div>
+      <div class="small" id="skyBandNote" style="margin-top:3px;color:#9fb4cc;font-size:11px;text-align:center"></div>
     </div>
     <div id="cueline">Reading the sky&hellip;</div>
     <div class="btnrow" id="musterRow" hidden>
@@ -341,12 +343,13 @@ function binomAux(n,p){ let k=0; for(let i=0;i<n;i++) if(auxRng()<p) k++; return
 // dealt weather, never the weather itself. It blends the primary gauge read (on rng) with an extra reading
 // from auxRng, lowering the effective noise. Capped so d' never exceeds ~2.4 (an ambiguous night always survives).
 // Draws ONLY from auxRng, so the deck/gauge/mooring rng sequence stays byte-identical for a keeper without one.
+const INSTR_SD = [0.13, 0.105, 0.086, 0.070];   // read error by instrument tier: none -> barometer -> finer glass -> radar (d' ~1.85 -> 2.3 -> 2.8 -> 3.4, never a perfect oracle)
 function skyRefine(raw, base){
-  const w = [0, 0.10, 0.16, 0.22][Math.min(3, save.instrTier||0)] || 0;   // effective SD 0.13 -> 0.118 -> 0.111 -> 0.105 (d' <= 2.3, never an oracle)
-  if(w<=0) return raw;
-  const second = base + gaussAux()*CONFIG.gaugeSd;
-  return raw*(1-w) + second*w;
+  const tier = Math.min(3, save.instrTier||0);
+  if(tier<=0) return raw;   // no instrument: you go on the noisy gauge read, in words
+  return base + gaussAux()*INSTR_SD[tier];   // a sharper instrument estimates the true storm odds with less error. draws only from auxRng, so the deck/gauge sequence stays byte-identical without one.
 }
+function instrBand(){ return INSTR_SD[Math.min(3, save.instrTier||0)]; }   // half-width of the confidence band shown on the dial: it narrows as the instrument sharpens
 /* ============================ ASSETS ============================ */
 const IMG = {};
 ['bg_starlit','bg_storm','bg_dusk','bg_dawn','bg_harbor_fog','boat','deep','crew','coast_map','lighthouse_interior','portrait_marisol','portrait_odell','portrait_previous','portrait_sefu'].forEach(k=>{
@@ -1443,7 +1446,7 @@ function renderDecision(){
       // SEASON 2: read the weather, then decide how far to send the crew. btnLight = push out, btnDark = keep close.
       musterRow.hidden=true; choiceRow.hidden=false; $('btnLight').disabled=false; $('btnDark').disabled=false;
       const hasGlass = save.instrTier>=1;
-      $('sky').hidden = !hasGlass; if(hasGlass) $('skyNeedle').style.left=Math.round(G.sky*100)+'%';
+      $('sky').hidden = !hasGlass; if(hasGlass) renderSkyDial();
       if(G.finale){
         $('btnLight').innerHTML='Send them to the deep<span class="sub">the rich grounds, past the rumor</span>';
         $('btnDark').innerHTML='Keep them near shore<span class="sub">safe, but the town stays hungry</span>';
@@ -1499,13 +1502,13 @@ function renderDecision(){
       if(lp.rfx>=0.5 && !G.insights.probeCross && !L.decay){ G.insights.probeCross=1;
         insightLine='<div style="margin-top:9px;background:#fff7e2;color:#4a3d2a;border:2px solid var(--lampDk);border-left-width:6px;border-radius:8px;padding:8px 11px;text-align:left;font-family:Spectral,serif;font-size:13.5px;line-height:1.5">The crew ran for the harbor at the lamp alone, with no storm in the sky. The lamp by itself now does what only a real storm used to do. That reaction to the lamp alone is the conditioned response you have been building all season.</div>'; }
       cl.innerHTML='<div style="text-align:center">'
-        + '<div style="font-size:10.5px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#f5c14e">A cold test &middot; the lamp alone</div>'
-        + '<div style="font-size:20px;margin:5px 0"><b>'+lp.scramble+' of the seven</b> broke for the harbor.</div>'
-        + '<div style="font-family:Spectral,serif;color:#dbe6f5">The sea is flat, no storm behind the light. '+probePhrase(lp.rfx)+'</div>'
+        + '<div style="font-size:10.5px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;color:#f5c14e">The cold test &middot; the lamp with no storm</div>'
+        + '<div style="font-size:19px;margin:5px 0">You raised the lamp on a clear, calm night. <b>'+lp.scramble+' of the seven crews</b> came in to the harbor anyway, just from seeing it.</div>'
+        + '<div style="font-family:Spectral,serif;color:#dbe6f5">The more of the crew who come in for the lamp alone, with no storm to prove it right, the more they have truly learned to trust it. '+probePhrase(lp.rfx)+'</div>'
         + '<div class="small" style="margin-top:6px;color:#cfe0f2">'+deltaTxt+'</div>'
         + insightLine
         + '<div class="small" style="margin-top:9px;color:#9fb4cc">press Space, or tap, to go on &#9656;</div></div>';
-      announce(lp.scramble+' of seven broke for the lamp alone.');
+      announce(lp.scramble+' of the seven crews came in at the lamp alone.');
       return;
     }
     if(G.isMuster && !G.musterAnswered){
@@ -1536,7 +1539,7 @@ function renderDecision(){
     } else {
       musterRow.hidden=true; choiceRow.hidden=false; $('btnLight').disabled=false; $('btnDark').disabled=false;
       const hasGlass = save.instrTier>=1;   // the barometer dial is a shop item; without it you read the weather in words
-      $('sky').hidden = !hasGlass; if(hasGlass) $('skyNeedle').style.left=Math.round(G.sky*100)+'%';
+      $('sky').hidden = !hasGlass; if(hasGlass) renderSkyDial();
       if(G.isDecoy){
         $('btnLight').innerHTML='Light your lamp too<span class="sub">both lights burn</span>';
         $('btnDark').innerHTML='Keep the tower dark<span class="sub">let Sefu’s light stand alone</span>';
@@ -1587,6 +1590,12 @@ function renderDecision(){
     $('next').innerHTML = ((G.finale||G.boats<=0)? 'See how the season ends':'Next night')+'<span class="ring"></span>';
     announce((o.head||'')+' '+o.body+extra);
   }
+}
+function renderSkyDial(){   // the needle sits at tonight's read; the shaded band is how far it might be off, narrowing as your instrument sharpens
+  $('skyNeedle').style.left = Math.round(G.sky*100)+'%';
+  const hw=instrBand(), lo=Math.max(0,G.sky-hw), hi=Math.min(1,G.sky+hw);
+  const bd=$('skyBand'); if(bd){ bd.style.left=(lo*100)+'%'; bd.style.width=((hi-lo)*100)+'%'; }
+  const note=$('skyBandNote'); if(note) note.textContent='the shaded band is how far the reading might be off; a sharper glass narrows it';
 }
 function renderBelief(){
   const L=G.lev, thr=L.heedThreshold;
