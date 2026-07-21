@@ -471,7 +471,7 @@ const LEVELS = [
     back:null,
     nights:14, deckStorms:5, strata:[[3,4,1],[5,9,3],[10,13,1]],   // [fromNight,toNight,storms]; nights 1-2 always calm so the first boat can fish before any storm
     startTrust:26, heedThreshold:50, catchTarget:40, catchGoal:false, aWolf:0.14, startBoats:7, decay:0, quiet:null,
-    musterNights:[4,6,8,11,13], musterNeed:3,
+    musterNights:[], musterNeed:0, coldTestNights:[5,9,12],   // no prediction quiz; the conditioned response is measured by the cold-test reveal and the finale
     almanac:'Marisol, at the season’s first tide: “The almanac promises five great squalls, and after them the Deep.”',
     story:{ era:'St. Petersburg, the 1900s',
       body:'Ivan Pavlov was studying how dogs digest their food. He noticed something strange. The dogs started to drool before any food showed up, as soon as they heard the footsteps of the man who fed them. So Pavlov tried a test. He rang a bell right before each meal, over and over. After enough meals, the bell by itself made the dogs drool, with no food in sight. A sound that used to mean nothing now meant that food was coming.',
@@ -1310,7 +1310,12 @@ function proceed(){ if(state!=='resolved') return;
   if(G.finale && FINALE_INTROS[G.lev.id] && !G.finaleIntroShown && !TESTMODE){   // explain the Deep before the last night
     G.finaleIntroShown=true; showDialogue(FINALE_INTROS[G.lev.id], ()=>{ state='reading'; renderDecision(); canvas.focus({preventScroll:true}); }); return;
   }
-  state='reading'; renderDecision();
+  state='reading';
+  // a periodic cold test: measure the crew's reflex to the lamp alone and show it, then this night's normal decision follows. no prediction is asked.
+  if(!G.finale && !isFear(G.lev) && G.lev.coldTestNights && G.lev.coldTestNights.indexOf(G.night)>=0 && !TESTMODE){
+    runProbe(G.trust, G.lev.heedThreshold); startProbeBeat(); return;
+  }
+  renderDecision();
 }
 function nextNight(){ proceed(); }
 function endGame(won,reason){ state = won?'won':'lost'; G.endReason=reason||(won?'win':'boats');
