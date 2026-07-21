@@ -584,7 +584,7 @@ function shopItems(){ const all = [
     effect:['A dial that reads the sky, a real reading instead of the weather in words alone.','Steadier than your barometer in a rising wind, and clearer when the sky closes in.','The sharpest read of a storm a keeper can buy.','The clearest read a keeper can buy.'][save.instrTier],
     teach:'A better instrument tells the storm’s signal from the noise in the sky. Psychologists call that sensitivity, and a sharper tool raises it, though it never makes you certain.' },
   { key:'hulls', name:'Another Boat', sub: save.hulls+(save.hulls===1?' boat in your fleet':' boats in your fleet'),
-    cost: save.hulls<8? (20 + 10*(save.hulls-1)) : null, gated:false,   // each boat costs more than the last
+    cost: save.hulls<8? (25 + 10*(save.hulls-1)) : null, gated:false,   // each boat costs more than the last; base 25 keeps the first boat above the $20 starting wage so only the Gazette is affordable at the start
     effect: 'Adds a boat, bringing your fleet to '+(save.hulls+1)+'. Each boat you buy costs more than the last. If you lose them all in one season, the season is over.',
     teach:'With more boats, losing one to a storm hurts less. The more a wrong call would cost you, the more careful you should be, and a deep fleet makes each wrong call cheaper.' },
   { key:'storageTier', name:'A Bigger Ice Cellar', sub:'holds '+[10,20,35,55,80][save.storageTier]+' fish now',
@@ -1545,6 +1545,23 @@ function renderDecision(){
       musterRow.hidden=true; choiceRow.hidden=false; $('btnLight').disabled=false; $('btnDark').disabled=false;
       const hasGlass = save.instrTier>=1;   // the barometer dial is a shop item; without it you read the weather in words
       $('sky').hidden = !hasGlass; if(hasGlass) renderSkyDial();
+      if(isFear(G.lev)){
+        // SEASON 2 (counterconditioning): push the crew past their nerve, or keep them close
+        if(G.finale){
+          $('sky').hidden=true;
+          $('btnLight').innerHTML='Send them to the deep<span class="sub">brave the rumor</span>';
+          $('btnDark').innerHTML='Keep them close<span class="sub">safe, but hungry</span>';
+          cl.innerHTML='<b>The town needs a great haul from the deep grounds tonight, but the crew whisper that a monster waits out there.</b><br>There is no monster. It is a fear the town talked itself into. Read their courage below: above the line, they will face the deep and find only fish. Send them out, or keep them close.';
+          announce('The last night. Send the crew to the deep grounds, or keep them close?');
+        } else {
+          $('btnLight').innerHTML='Push them further out<span class="sub">a step past their nerve</span>';
+          $('btnDark').innerHTML='Keep them close<span class="sub">near shore, or hold in</span>';
+          cl.innerHTML = 'Night '+G.night+'. '+G.skyLine+' <b>'+skyOdds(G.sky)+'</b>.'
+            + ' <span style="color:#9fd8b0">On a calm night, push them further out to build their courage. Push them into a storm and it shatters.</span>'
+            + (G.lev.rumorNight && G.night>=G.lev.rumorNight ? ' <span style="color:var(--warn)">Talk of a monster in the deep is spreading, and it eats at their nerve.</span>' : '');
+          announce('Night '+G.night+'. '+G.skyLine+' '+skyOdds(G.sky)+'. Push them further out, or keep them close?');
+        }
+      } else {
       if(G.isDecoy){
         $('btnLight').innerHTML='Light your lamp too<span class="sub">both lights burn</span>';
         $('btnDark').innerHTML='Keep the tower dark<span class="sub">let Sefu’s light stand alone</span>';
@@ -1558,6 +1575,7 @@ function renderDecision(){
         + (G.isMuster && G.musterAnswered && !G.isDecoy ? '<div class="bark"><img src="assets/portrait_marisol.webp" alt="" onerror="this.style.display=\'none\'"><span>'+gossipLine()+'</span></div>' : '')
         + (G.inQuiet ? ' <span style="color:var(--warn)">The calm holds.</span>' : '');
       announce('Night '+G.night+'. '+G.skyLine+' '+skyOdds(G.sky)+(G.isDecoy?'. Sefu’s lantern is lit. Light your lamp too, or keep the tower dark?':'. Light the lamp, or leave it dark?'));
+      }
     }
   } else if(state==='resolved'){
     musterRow.hidden=true; choiceRow.hidden=true; $('sky').hidden=true;
@@ -1616,14 +1634,21 @@ function renderBelief(){
       : 'Not yet a habit. Reward the nights they actually drill to build it.';
     return;
   }
-  if(isFear(L)){   // SEASON 2: the meter is the crew's courage, stored in G.trust
+  if(isFear(L)){   // SEASON 2: the meter is the crew's courage (G.trust); a second bar is their agitation (nerves)
     $('bLab').textContent='The crew’s courage';
     $('bFill').style.width=G.trust+'%'; $('bHeed').style.left=thr+'%';
     $('bNote').textContent = G.trust>=thr ? 'brave enough to fish the deep grounds' : 'not yet brave enough for the deep grounds';
-    $('bRow2').hidden=true;
+    const agit=G.agitation||0, floodAt=L.floodAt||44, tooTense=agit>=floodAt;
+    const r2=$('bRow2'); r2.hidden=false;
+    r2.querySelector('.blab').textContent='Their nerves (push past the line and the fear floods back)';
+    $('bFill2').style.width=Math.min(100,agit)+'%'; $('bHeed2').style.left=Math.min(100,floodAt)+'%';
+    $('bFill2').style.background = tooTense ? 'linear-gradient(90deg,#b5502e,#d97a4a)' : '';
+    $('bNote2').textContent = tooTense ? 'too worked up to push, let them settle' : 'settled enough to push a little further';
     $('bHint').innerHTML = G.trust>=thr
-      ? 'They will sail the deep grounds now. Keep their nerve up on calm nights, and hold it past the monster rumor.'
-      : 'Below the line. Push them a little further out on a calm night, and a safe catch will teach the fear back out.';
+      ? 'Brave enough for the deep grounds. Keep their nerve up on the calm nights, and hold it past the monster rumor.'
+      : tooTense
+        ? 'They are too worked up to push tonight. Keep them close so their nerves settle, then push again on the next calm night.'
+        : 'On a calm night, push them a little further out. A safe catch teaches the fear back out and lifts their courage. In a storm, keep them close.';
     return;
   }
   $('bLab').textContent = L.id===3? 'Their belief in your lamp (CS+)' : 'The crew’s belief in your lamp';
